@@ -38,6 +38,7 @@ class Handler extends ExceptionHandler
             if (Auth::check()) {
                 $user = Auth::user();
 
+                /** @var \App\Models\User $user */
                 if ($user->hasRole('admin')) {
                     return redirect()->route('admin.dashboard')->with('error', 'You do not have permission to access that page.');
                 } elseif ($user->hasRole('hr')) {

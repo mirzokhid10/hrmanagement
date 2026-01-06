@@ -12,8 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            // Make company_id nullable because a Super Admin might not belong to a specific tenant company initially.
-            // Or users can be invited to companies later.
             $table->foreignId('company_id')->nullable()->constrained()->cascadeOnDelete();
         });
     }

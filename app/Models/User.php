@@ -2,45 +2,30 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
+        'company_id',
         'name',
         'email',
         'password',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -51,22 +36,46 @@ class User extends Authenticatable
 
     protected static function booted(): void
     {
-        // Apply the TenantScope to the User model IF a tenant is active
         static::addGlobalScope(new TenantScope);
 
-        // When creating a new user, automatically assign the current company_id
         static::creating(function ($user) {
-            if (app()->bound('tenant') && app('tenant')) {
+            if (!$user->company_id && app()->bound('tenant') && app('tenant')) {
                 $user->company_id = app('tenant')->id;
             }
         });
     }
 
-    /**
-     * Get the company that owns the user.
-     */
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function employee(): HasOne
+    {
+        return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * Check if this user is an admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if this user is an HR manager.
+     */
+    public function isHRManager(): bool
+    {
+        return $this->hasRole('hr'); // Changed from 'hr_manager' to 'hr'
+    }
+
+    /**
+     * Admins can access all companies within the platform
+     */
+    public function canAccessAllCompanies(): bool
+    {
+        return $this->isAdmin();
     }
 }

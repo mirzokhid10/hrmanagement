@@ -15,7 +15,7 @@ class Company extends Model
         'name',
         'slug',
         'subdomain',
-        'owner_id',
+        'user_id',
         'is_active',
     ];
 
@@ -24,7 +24,7 @@ class Company extends Model
      */
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'owner_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
@@ -33,5 +33,25 @@ class Company extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class); // Assuming an Employee model exists
+    }
+
+    public function departments()
+    {
+        return $this->hasMany(Department::class);
+    }
+
+    protected static function booted(): void
+    {
+        // IMPORTANT: DO NOT ADD TenantScope here.
+        // The Company model itself is the entity that defines the tenant.
+        // It should not be tenant-scoped by its own mechanism.
+
+        // If you had other global scopes or creating callbacks for Company,
+        // they would go here. For example, if you wanted to auto-set owner_id:
+        // static::creating(function (Company $company) {
+        //     if (Auth::check()) {
+        //         $company->user_id = Auth::id();
+        //     }
+        // });
     }
 }

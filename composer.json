@@ -12,19 +12,21 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "mckenziearts/laravel-notify": "*",
+        "mckenziearts/laravel-notify": "^2.7",
         "spatie/laravel-permission": "^6.24"
     },
     "require-dev": {
+        "barryvdh/laravel-debugbar": "^3.16",
         "fakerphp/faker": "^1.23",
         "laravel/boost": "^1.8",
         "laravel/breeze": "^2.3",
-        "laravel/pail": "^1.2.2",
+        "laravel/pail": "^1.2",
         "laravel/pint": "^1.24",
         "laravel/sail": "^1.41",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^11.5.3"
+        "phpunit/phpunit": "^11.5.3",
+        "redberry/laravel-console": "^1.1"
     },
     "autoload": {
         "psr-4": {

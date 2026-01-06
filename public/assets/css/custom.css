@@ -1,0 +1,113 @@
+hr {
+    margin: 1rem 0;
+    color: inherit;
+    border: 0;
+    border-top-width: 0px;
+    border-top-style: none;
+    border-top-color: currentcolor;
+    border-right-style: none;
+    border-bottom-style: none;
+    border-left-style: none;
+    border-top: var(--bs-border-width) solid;
+    opacity: 0.25;
+}
+
+.notify {
+    z-index: 1000 !important;
+}
+
+.notify,
+.notifyjs-corner {
+    z-index: 1000 !important;
+}
+
+.border-dashed {
+    margin: 1rem 0;
+    color: inherit;
+    border: 0;
+    border-top-width: 0px;
+    border-top-style: none;
+    border-top-color: currentcolor;
+    border-right-style: none;
+    border-bottom-style: none;
+    border-left-style: none;
+    border-top: var(--bs-border-width) solid;
+    border-style: dashed;
+    opacity: 0.25;
+}
+
+.btn-primary {
+    color: #ffffff !important;
+    background-color: #316aff !important;
+    border-color: #316aff !important;
+}
+
+.dt-column-order::before,
+.dt-column-order::after,
+.dropdown-toggle::after,
+.dropdown-toggle::before {
+    display: none !important;
+}
+
+.custom-green {
+    color: #4caf50;
+}
+
+.custom-red {
+    color: #e57373;
+}
+
+.custom-orange {
+    color: #ffc107;
+}
+
+.custom-blue {
+    color: #2196f3;
+}
+
+.btn.btn-subtle-success {
+    background-color: #e9f7f2 !important;
+    border-color: #e9f7f2 !important;
+    color: #22b07e !important;
+}
+
+.btn.btn-subtle-primary {
+    background-color: #eaf0ff !important;
+    border-color: #eaf0ff !important;
+    color: #316aff !important;
+}
+
+.btn.btn-subtle-secondary {
+    background-color: #fff2e7 !important;
+    border-color: #fff2e7 !important;
+    color: #ff8110 !important;
+}
+
+.btn-outline-light {
+    color: #0c243c !important;
+    border-color: #e8ebf1 !important;
+}
+
+.btn.btn-subtle-success:hover,
+.btn.btn-subtle-success:focus,
+.btn.btn-subtle-success:active {
+    color: #fff !important;
+    background-color: #22b07e !important;
+    border-color: #22b07e !important;
+}
+
+.btn.btn-subtle-primary:hover,
+.btn.btn-subtle-primary:focus,
+.btn.btn-subtle-primary:active {
+    color: #fff !important;
+    background-color: #316aff !important;
+    border-color: #316aff !important;
+}
+
+.btn.btn-subtle-secondary:hover,
+.btn.btn-subtle-secondary:focus,
+.btn.btn-subtle-secondary:active {
+    color: #fff !important;
+    background-color: #ff8110 !important;
+    border-color: #ff8110 !important;
+}
