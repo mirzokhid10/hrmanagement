@@ -24,10 +24,9 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
-                                        <button type="button" class="dropdown-item edit-employee-btn"
-                                            data-bs-toggle="modal" data-bs-target="#editEmployeeModal"
-                                            data-id="{{ $employee->id }}"> Edit
-                                        </button>
+                                        <a href="{{ route('admin.employee.edit', $employee->id) }}"
+                                            class="dropdown-item edit-employee-btn"> Edit
+                                        </a>
                                     </li>
                                     <li>
                                         <form action="{{ route('admin.employee.destroy', $employee->id) }}"

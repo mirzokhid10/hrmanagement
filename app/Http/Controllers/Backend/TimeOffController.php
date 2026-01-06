@@ -30,17 +30,29 @@ class TimeOffController extends Controller
      */
     public function index(Request $request): View
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Determine the company_id for filtering.
+        // If the user is an admin, pass null to the service, which means the TenantScope will bypass.
+        // Otherwise, pass the user's company_id for regular tenant-scoped filtering.
+        $companyIdForQuery = $user->isAdmin() ? null : $user->company_id;
+
         $filters = $request->only(['status', 'employee_id']);
-        $timeOffs = $this->timeOffService->getPaginatedTimeOffs(10, $filters);
+        $timeOffs = $this->timeOffService->getPaginatedTimeOffs($companyIdForQuery, 10, $filters);
 
         $statuses = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
 
-        $employeesForDropdown = $this->timeOffService->getCompanyEmployees(Auth::user()->company_id)
+        // For dropdowns (employees and time off types), these are typically scoped to the *current user's company*
+        // even if the admin is viewing all data. If an admin should filter by employees from *any* company
+        // in these dropdowns, those service methods would also need a nullable companyId parameter.
+        // For now, let's keep dropdowns scoped to the admin's own company as a default.
+        $employeesForDropdown = $this->timeOffService->getCompanyEmployees($user->company_id)
             ->mapWithKeys(function ($employee) {
                 return [$employee->id => ($employee->full_name . ' (' . ($employee->job_title ?? 'N/A Job Title') . ')')];
             })->sort();
 
-        $timeOffTypesForDropdown = $this->timeOffService->getTimeOffTypes(Auth::user()->company_id);
+        $timeOffTypesForDropdown = $this->timeOffService->getTimeOffTypes($user->company_id);
 
         return view('admin.time-offs.index', compact('timeOffs', 'statuses', 'employeesForDropdown', 'timeOffTypesForDropdown'));
     }

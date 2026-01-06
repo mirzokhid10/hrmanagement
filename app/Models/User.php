@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -36,7 +35,6 @@ class User extends Authenticatable
 
     protected static function booted(): void
     {
-        static::addGlobalScope(new TenantScope);
 
         static::creating(function ($user) {
             if (!$user->company_id && app()->bound('tenant') && app('tenant')) {

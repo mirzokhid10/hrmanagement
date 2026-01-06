@@ -15,9 +15,15 @@ use Illuminate\Support\Facades\Log;
 
 class TimeOffService implements TimeOffServiceInterface
 {
-    public function getPaginatedTimeOffs(int $perPage = 10, array $filters = []): LengthAwarePaginator
+    public function getPaginatedTimeOffs(?int $companyId, int $perPage = 10, array $filters = []): LengthAwarePaginator
     {
         $query = TimeOff::with(['employee.user', 'employee.department', 'type', 'approver.user']);
+
+        // Explicitly apply company_id filter ONLY if $companyId is provided.
+        // If $companyId is null (for admin), the TenantScope on TimeOff model will bypass the filter.
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
 
         if (isset($filters['status']) && $filters['status'] !== 'All') {
             $query->where('status', $filters['status']);
@@ -25,7 +31,6 @@ class TimeOffService implements TimeOffServiceInterface
         if (isset($filters['employee_id']) && $filters['employee_id']) {
             $query->where('employee_id', $filters['employee_id']);
         }
-        // Add more filters as needed (e.g., date range)
 
         return $query->latest('start_date')->paginate($perPage);
     }

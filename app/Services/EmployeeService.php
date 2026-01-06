@@ -5,16 +5,16 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
-use App\Models\User; // Still need User model for login accounts
 use App\Services\Interfaces\EmployeeServiceInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use App\Scopes\TenantScope; // Ensure this is imported for withoutGlobalScope
 
 class EmployeeService implements EmployeeServiceInterface
 {
@@ -25,22 +25,44 @@ class EmployeeService implements EmployeeServiceInterface
         $this->app = $app;
     }
 
-    protected function getCurrentTenant(): Company
+    /**
+     * Helper to safely get the current bound tenant.
+     * Returns null if no tenant is bound.
+     */
+    protected function getBoundTenant(): ?Company
     {
-        if (!$this->app->bound('tenant') || !$this->app->get('tenant') instanceof Company) {
-            throw new \RuntimeException("No tenant is bound to the application. Ensure TenantMiddleware is active and successfully identified a company.");
-        }
-        return $this->app->get('tenant');
+        return $this->app->bound('tenant') && $this->app->get('tenant') instanceof Company
+            ? $this->app->get('tenant')
+            : null;
     }
 
-    public function getPaginatedEmployees(int $perPage = 10, ?string $searchTerm = null): LengthAwarePaginator
+    /**
+     * Get a paginated list of employees.
+     * @param ?int $companyId If null, TenantScope will apply (or bypass for admin).
+     */
+    public function getPaginatedEmployees(?int $companyId, int $perPage = 10, ?string $searchTerm = null): LengthAwarePaginator
     {
-        $currentCompany = $this->getCurrentTenant();
+        $query = Employee::with(['department']);
 
-        $query = Employee::with(['department'])
-            ->where('company_id', $currentCompany->id); // Explicitly scope, though global scope helps
+        /** @var \App\Models\User $loggedInUser */
+        $loggedInUser = Auth::user();
 
-        // Apply search filter if a search term is provided
+        if ($loggedInUser->isAdmin()) {
+            // Admins can potentially see employees from all companies.
+            // If $companyId is null, remove the global TenantScope to see all.
+            // If $companyId is provided, filter specifically by that company.
+            if ($companyId === null) {
+                $query->withoutGlobalScope(TenantScope::class);
+            } else {
+                $query->where('company_id', $companyId);
+            }
+        } else {
+            // Non-admins (HR) always see only their company's employees.
+            // The global TenantScope should already handle this if a tenant is bound.
+            // If for some reason a tenant isn't bound, fall back to the user's company_id.
+            $query->where('company_id', $loggedInUser->company_id);
+        }
+
         if ($searchTerm) {
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('first_name', 'like', '%' . $searchTerm . '%')
@@ -48,7 +70,6 @@ class EmployeeService implements EmployeeServiceInterface
                     ->orWhere('email', 'like', '%' . $searchTerm . '%')
                     ->orWhere('job_title', 'like', '%' . $searchTerm . '%');
 
-                // Search in department name
                 $q->orWhereHas('department', function ($dq) use ($searchTerm) {
                     $dq->where('name', 'like', '%' . $searchTerm . '%');
                 });
@@ -58,105 +79,103 @@ class EmployeeService implements EmployeeServiceInterface
         return $query->paginate($perPage);
     }
 
-    public function getDepartments(): Collection
+    /**
+     * Get all departments for a specific company.
+     * @param int $companyId The ID of the company to retrieve departments for.
+     */
+    public function getDepartments(int $companyId): Collection
     {
-        $currentCompany = $this->getCurrentTenant();
-        return Department::where('company_id', $currentCompany->id)->get();
+        return Department::where('company_id', $companyId)->get();
     }
 
+    /**
+     * Find an employee by ID.
+     * TenantScope handles admin bypass/regular user scoping.
+     */
     public function findEmployee(string $id): ?Employee
     {
-        // Employee model has global scope, so where('company_id', ...) is technically redundant but harmless.
+        // The Employee model's TenantScope will automatically filter by the bound tenant's company_id
+        // unless the current user is an admin and the scope is bypassed (e.g., using withoutGlobalScope).
         return Employee::with(['department'])->find($id);
     }
 
-    public function createEmployee(array $data, ?UploadedFile $image = null): Employee
+    /**
+     * Create a new employee (without creating a User login account by default).
+     * @param array $data Employee data.
+     * @param ?UploadedFile $image Profile image.
+     * @param ?int $companyId Optional company ID to create the employee for (for admins).
+     */
+    public function createEmployee(array $data, ?UploadedFile $image = null, ?int $companyId = null): Employee
     {
-        $currentCompany = $this->getCurrentTenant();
+        /** @var \App\Models\User $loggedInUser */
+        $loggedInUser = Auth::user();
 
-        return DB::transaction(function () use ($data, $image, $currentCompany) {
-            // 1. Create the User account for the new employee (for login)
-            $user = User::create([
-                'name' => $data['first_name'] . ' ' . $data['last_name'],
-                'email' => $data['email'],
-                'password' => Hash::make(Str::random(10)), // Auto-generate a temporary password
-                'company_id' => $currentCompany->id, // Associate user with the current tenant for login
-                'email_verified_at' => now(), // Assume verified for new internal employees
-            ]);
+        $targetCompanyId = null;
 
-            // 2. Handle profile image upload
-            // We use the newly created Employee ID for filename (or a temp ID if not yet created).
-            // A common approach is to store the image after the employee record is created,
-            // or use a temporary unique identifier for the filename.
-            // For now, let's use a UUID or similar to name the image, then update employee.
-            $profileImagePath = $this->handleProfileImageUpload(Str::uuid(), $image); // Use UUID for initial filename
+        if ($loggedInUser->isAdmin()) {
+            // Admin must provide company_id in data or through $companyId parameter
+            $targetCompanyId = $companyId ?? ($data['company_id'] ?? null);
+            if (!$targetCompanyId) {
+                throw new \InvalidArgumentException("Admin must specify a company ID for employee creation.");
+            }
+        } else {
+            // Non-admin (HR) can only create employees for their own company
+            $targetCompanyId = $loggedInUser->company_id;
+        }
 
-            // 3. Create the Employee profile
-            $employee = Employee::create([
-                'company_id' => $currentCompany->id,
-                'department_id' => $data['department_id'],
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'email' => $data['email'],
-                'phone_number' => $data['phone_number'] ?? null,
-                'job_title' => $data['job_title'],
-                'hire_date' => $data['hire_date'],
-                'status' => $data['status'],
-                'date_of_birth' => $data['date_of_birth'] ?? null,
-                'address' => $data['address'] ?? null,
-                'image' => $profileImagePath, // Store image path
-                'salary' => $data['salary'] ?? null,
-            ]);
+        $targetCompany = Company::find($targetCompanyId);
+        if (!$targetCompany) {
+            throw new \InvalidArgumentException("Target company (ID: {$targetCompanyId}) not found.");
+        }
 
-            // If image was uploaded, rename it using the actual employee ID
-            if ($profileImagePath && $image) {
+        return DB::transaction(function () use ($data, $image, $targetCompany, $targetCompanyId) {
+            $profileImagePath = null;
+            if ($image) {
+                // Use a temporary UUID for the file name initially.
+                // We'll rename it after the employee is created with their actual ID.
+                $tempIdentifier = Str::uuid()->toString();
+                $profileImagePath = $this->handleProfileImageUpload($tempIdentifier, $image, $targetCompany);
+            }
+
+            $employee = Employee::create(array_merge($data, [
+                'company_id' => $targetCompanyId,
+                'user_id' => null, // Explicitly set to null as employees don't have login accounts by default
+                'image' => $profileImagePath,
+            ]));
+
+            // If an image was uploaded with a temporary UUID, rename it using the actual employee ID
+            if ($profileImagePath && $image && Str::contains($profileImagePath, $tempIdentifier)) {
                 $oldPath = $profileImagePath;
                 $newFileName = $employee->id . '_' . time() . '.' . $image->getClientOriginalExtension();
-                $directory = 'employees/' . $currentCompany->slug;
-                $newPath = $image->storeAs($directory, $newFileName, 'public'); // Store again with new name
+                $directory = 'employees/' . $targetCompany->slug;
+                $newPath = Storage::disk('public')->putFileAs($directory, $image, $newFileName);
 
-                // Delete the old file if it's different and exists
                 if ($oldPath !== $newPath && Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
-                $employee->update(['image' => $newPath]); // Update employee with final image path
+                $employee->update(['image' => $newPath]);
             }
             return $employee;
         });
     }
 
+    /**
+     * Update an existing employee.
+     */
     public function updateEmployee(Employee $employee, array $data, ?UploadedFile $image = null, bool $removeImage = false): Employee
     {
-        $currentCompany = $this->getCurrentTenant();
+        /** @var \App\Models\User $loggedInUser */
+        $loggedInUser = Auth::user();
 
-        if ($employee->company_id !== $currentCompany->id) {
-            throw new \Exception("Employee does not belong to the current company.");
+        // Security check: Only allow update if employee belongs to current tenant OR logged-in user is admin
+        // This check is duplicated from the controller for robustness, though the controller should handle authorization.
+        if (!$loggedInUser->isAdmin() && $employee->company_id !== $loggedInUser->company_id) {
+            throw new \Exception("Unauthorized: Employee does not belong to your company context and you are not an admin.");
         }
 
-        return DB::transaction(function () use ($employee, $data, $image, $removeImage, $currentCompany) {
-            // Update User account (login credentials) - find by email and company_id
-            $user = User::where('email', $employee->email)
-                ->where('company_id', $currentCompany->id)
-                ->first();
-
-            if ($user) {
-                $user->update([
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $data['email'],
-                ]);
-            } else {
-                \Log::warning("Employee ID: {$employee->id} (Email: {$employee->email}) has no associated User login account. Creating one.");
-                User::create([
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $data['email'],
-                    'password' => Hash::make(Str::random(10)), // Generate a new password
-                    'company_id' => $currentCompany->id,
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            // Handle profile image update/removal
+        return DB::transaction(function () use ($employee, $data, $image, $removeImage) {
             $profileImagePath = $employee->image;
+
             if ($removeImage && $profileImagePath) {
                 Storage::disk('public')->delete($profileImagePath);
                 $profileImagePath = null;
@@ -164,65 +183,53 @@ class EmployeeService implements EmployeeServiceInterface
                 if ($profileImagePath) {
                     Storage::disk('public')->delete($profileImagePath); // Delete old image
                 }
-                $profileImagePath = $this->handleProfileImageUpload($employee->id, $image); // Use employee ID
+                $profileImagePath = $this->handleProfileImageUpload($employee->id, $image, $employee->company);
             }
 
-            // Update Employee profile
-            $employee->update([
-                'department_id' => $data['department_id'],
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'email' => $data['email'],
-                'phone_number' => $data['phone_number'] ?? null,
-                'job_title' => $data['job_title'],
-                'hire_date' => $data['hire_date'],
-                'status' => $data['status'],
-                'date_of_birth' => $data['date_of_birth'] ?? null,
-                'address' => $data['address'] ?? null,
+            $employee->update(array_merge($data, [
                 'image' => $profileImagePath,
-                'salary' => $data['salary'] ?? null,
-            ]);
+            ]));
 
             return $employee;
         });
     }
 
+    /**
+     * Delete an employee.
+     */
     public function deleteEmployee(Employee $employee): bool
     {
-        $currentCompany = $this->getCurrentTenant();
+        /** @var \App\Models\User $loggedInUser */
+        $loggedInUser = Auth::user();
 
-        if ($employee->company_id !== $currentCompany->id) {
-            throw new \Exception("Employee does not belong to the current company.");
+        // Security check: Only allow delete if employee belongs to current tenant OR logged-in user is admin
+        if (!$loggedInUser->isAdmin() && $employee->company_id !== $loggedInUser->company_id) {
+            throw new \Exception("Unauthorized: Employee does not belong to your company context and you are not an admin.");
         }
 
         return DB::transaction(function () use ($employee) {
-            // Delete profile image if exists
             if ($employee->image) {
                 Storage::disk('public')->delete($employee->image);
             }
-
-            // Delete the associated User login account
-            User::where('email', $employee->email)
-                ->where('company_id', $employee->company_id)
-                ->delete();
-
             return $employee->delete();
         });
     }
 
-
     /**
      * Helper method to handle profile image upload.
-     * Uses an identifier (e.g., employee ID, UUID) for filename.
+     * Requires the Company object for directory path.
+     * @param string|int $identifier Unique identifier for the file (e.g., employee ID, UUID).
+     * @param ?UploadedFile $image The uploaded file.
+     * @param Company $company The company context for storing the image.
+     * @return ?string The path to the stored image, or null if no image.
      */
-    protected function handleProfileImageUpload(string $identifier, ?UploadedFile $image): ?string
+    protected function handleProfileImageUpload(string|int $identifier, ?UploadedFile $image, Company $company): ?string
     {
         if (!$image) {
             return null;
         }
 
-        $currentCompany = $this->getCurrentTenant();
-        $directory = 'employees/' . $currentCompany->slug;
+        $directory = 'employees/' . $company->slug;
         $fileName = $identifier . '_' . time() . '.' . $image->getClientOriginalExtension();
         return $image->storeAs($directory, $fileName, 'public');
     }

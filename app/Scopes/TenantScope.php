@@ -2,64 +2,62 @@
 
 namespace App\Scopes;
 
-use App\Models\User;
+use App\Models\User; // Still need User model for isAdmin check
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\App;
 
 class TenantScope implements Scope
 {
+    /**
+     * Apply the scope to a given Eloquent query builder.
+     */
     public function apply(Builder $builder, Model $model): void
     {
-
-        // CRITICAL: Skip scope entirely during login/authentication
-        // This prevents queries from running TenantScope before user is loaded
+        // 1. CRITICAL: Skip scope entirely during authentication processes
         if ($this->isAuthenticationProcess()) {
             return;
         }
 
-        // For User model - special handling to prevent infinite loops
+        // IMPORTANT: If the model being queried is the User model itself,
+        // we explicitly do NOT apply this TenantScope.
+        // The User model is the source of truth for the tenant context,
+        // and applying this scope to it causes recursion/circular dependency.
         if ($model instanceof User) {
-            // Only apply if user is already authenticated
-            if (Auth::hasUser()) {
-                $user = Auth::user();
-
-                /** @var \App\Models\User $user */
-                // Admins see everything
-                if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
-                    return;
-                }
-
-                // Regular users see only their company
-                if ($user && $user->company_id) {
-                    $builder->where($model->getTable() . '.company_id', $user->company_id);
-                }
-            }
-            return;
+            return; // Do not apply this TenantScope to the User model.
         }
 
-        // For all other models
+        // 2. If a user is authenticated
         if (Auth::check()) {
+            /** @var \App\Models\User $user */
+            // Auth::user() is now safe to call because the User model no longer has this global scope.
             $user = Auth::user();
 
-            /** @var \App\Models\User $user */
-            // Admins see everything
-            if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
-                return;
+            // If the authenticated user is an admin, they see everything.
+            if ($user->isAdmin()) {
+                return; // Admin bypass: do not apply any scope filter
             }
 
-            // Regular users see only their company data
+            // For non-admin users (like HR managers), apply the scope to their company_id
             if ($user->company_id) {
                 $builder->where($model->getTable() . '.company_id', $user->company_id);
+                return; // Scope applied for non-admin user
             }
-            return;
         }
 
-        // Fall back to tenant binding (for public routes with tenant context)
-        if (app()->bound('tenant') && app('tenant')) {
+        // 3. Fallback for guests (no authenticated user) with a bound tenant
+        // This is for public routes where a tenant (e.g., via subdomain) is identified.
+        if (App::bound('tenant') && App::get('tenant')) {
             $builder->where($model->getTable() . '.company_id', app('tenant')->id);
+            return; // Scope applied for guest with bound tenant
         }
+
+        // 4. Default: If no user, no admin, and no tenant bound, no scope is applied.
+        // This means queries will return all records. Ensure routes requiring tenant context
+        // or authentication are protected by middleware.
     }
 
     /**
@@ -67,10 +65,10 @@ class TenantScope implements Scope
      */
     protected function isAuthenticationProcess(): bool
     {
-        // Check if we're on login routes
         $routeName = request()->route()?->getName();
+        $requestPath = request()->path();
 
-        $authRoutes = [
+        $authRouteNames = [
             'login',
             'login.post',
             'logout',
@@ -84,6 +82,14 @@ class TenantScope implements Scope
             'verification.send',
         ];
 
-        return in_array($routeName, $authRoutes);
+        if ($routeName && in_array($routeName, $authRouteNames)) {
+            return true;
+        }
+
+        if (Str::startsWith($requestPath, 'login') || Str::startsWith($requestPath, 'register') || Str::startsWith($requestPath, 'password')) {
+            return true;
+        }
+
+        return false;
     }
 }

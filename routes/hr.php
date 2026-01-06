@@ -20,4 +20,4 @@ use Illuminate\Support\Facades\Route;
 // No need for '/hr' prefix here, as it will be applied in RouteServiceProvider
 
 // Change 'hr_manager.dashboard' to 'dashboard'
-Route::get('/dashboard', [HrManagerDashboardController::class, 'index'])->name('dashboard'); // This becomes hr.dashboard
+Route::get('/dashboard', [HrManagerDashboardController::class, 'dashboard'])->name('dashboard'); // This becomes hr.dashboard

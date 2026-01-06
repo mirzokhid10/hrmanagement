@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
-use App\Models\Employee; // Ensure Employee model is imported
+use App\Models\Company;
+use App\Models\Department; // Import Department model
+use App\Models\Employee;
 use App\Services\Interfaces\EmployeeServiceInterface;
-use App\Scopes\TenantScope;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException; // Keep for explicit error handling
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeController extends Controller
 {
@@ -23,44 +25,79 @@ class EmployeeController extends Controller
 
     /**
      * Display a listing of the resource.
-     * Uses a simple paginated view, similar to how you might use a DataTable.
+     * Shows a paginated list of employees.
      */
     public function index(Request $request)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $companyIdForQuery = $user->isAdmin() ? null : $user->company_id; // null for admin to see all, or specific company for HR
+        $searchTerm = $request->query('search');
+        $perPage = 8;
 
-        $searchTerm = $request->input('search'); // Get the search term
-        $employees = $this->employeeService->getPaginatedEmployees(10, $searchTerm);
-        $departments = $this->employeeService->getDepartments();
+        $employees = $this->employeeService->getPaginatedEmployees($companyIdForQuery, $perPage, $searchTerm);
 
-        // If it's an AJAX request, return only the rendered employee list partial
-        if ($request->ajax()) {
-            return view('admin.employee.partials._employee_list', compact('employees'))->render();
-        }
+        // For the index view, we might need departments/companies for filters or display.
+        // For non-admin, departments are scoped to their company. For admin, we could pass all or none.
+        // Given the original index, let's keep it simple: departments for the current user's company (if not admin).
+        $departments = $user->company_id ? Department::where('company_id', $user->company_id)->get() : collect();
+        $companies = $user->isAdmin() ? Company::all() : collect(); // Only load all companies if admin
 
-        // For a regular request, return the full index view
-        return view('admin.employee.index', compact('employees', 'departments', 'searchTerm'));
+        return view('admin.employee.index', compact('employees', 'departments', 'searchTerm', 'companies'));
     }
 
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Admin can choose a company, so pass all companies.
+        // For non-admins, the company is fixed.
+        $companies = $user->isAdmin() ? Company::all() : collect([$user->company]);
+
+        // Departments will be pre-filtered if not admin, or initially empty/all if admin
+        // and relying on JS to update (which we're not doing now).
+        // For a non-JS admin form, if they select a company, they'd typically be redirected to a company-specific create form.
+        // For simplicity, if not admin, load their company's departments. If admin, load all departments.
+        $departments = $user->isAdmin() ? Department::all() : ($user->company_id ? Department::where('company_id', $user->company_id)->get() : collect());
+
+        return view('admin.employee.create', compact('departments', 'companies'));
+    }
 
     /**
      * Store a newly created resource in storage.
      */
     public function store(StoreEmployeeRequest $request)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $data = $request->validated();
+        $image = $request->file('image');
+
+        // Determine the company ID for the service call
+        $companyIdForService = null;
+        if ($user->isAdmin() && isset($data['company_id'])) {
+            $companyIdForService = (int) $data['company_id'];
+        } elseif (!$user->isAdmin()) {
+            $companyIdForService = $user->company_id;
+        }
 
         try {
-            $this->employeeService->createEmployee(
-                $request->validated(),
-                $request->file('image')
-            );
-            notify()->success('Employee added successfully!');
+            $this->employeeService->createEmployee($data, $image, $companyIdForService);
+            notify()->success('Employee created successfully.');
             return redirect()->route('admin.employee.index');
         } catch (ValidationException $e) {
-            notify()->error('Something went wrong, please try again:)');
+            // This catches validation errors that might be thrown directly from the service
+            // (e.g., if you added custom validation logic there).
             return redirect()->back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
-            notify()->error('Something went wrong, please try again:)');
-            return redirect()->back();
+            notify()->error('Failed to create employee. Please try again.');
+            Log::error('Error creating employee: ' . $e->getMessage(), ['exception' => $e]);
+            return back()->withInput();
         }
     }
 
@@ -69,13 +106,21 @@ class EmployeeController extends Controller
      */
     public function edit(Employee $employee) // Route Model Binding (scoped by TenantScope)
     {
-        if (request()->ajax() || request()->wantsJson()) {
-            $employee->load('department');
-            return response()->json($employee);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Security check: Ensure the employee belongs to the current user's company, or the user is an admin.
+        // The TenantScope on the Employee model already handles this for non-admins,
+        // but an explicit check adds clarity and robust error handling.
+        if (!$user->isAdmin() && $employee->company_id !== $user->company_id) {
+            notify()->error('Unauthorized access to employee record.');
+            return redirect()->route('admin.employee.index');
         }
 
-        $departments = $this->employeeService->getDepartments();
-        return view('admin.employee.edit', compact('employee', 'departments'));
+        $departments = Department::where('company_id', $employee->company_id)->get();
+        $companies = $user->isAdmin() ? Company::all() : collect([$employee->company]); // Pass all for admin, only employee's company for HR
+
+        return view('admin.employee.edit', compact('employee', 'departments', 'companies'));
     }
 
     /**
@@ -83,6 +128,15 @@ class EmployeeController extends Controller
      */
     public function update(UpdateEmployeeRequest $request, Employee $employee) // Use UpdateEmployeeRequest
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Security check: Only allow update if employee belongs to current tenant OR logged-in user is admin
+        if (!$user->isAdmin() && $employee->company_id !== $user->company_id) {
+            notify()->error('Unauthorized action on employee record.');
+            return redirect()->route('admin.employee.index');
+        }
+
         try {
             $this->employeeService->updateEmployee(
                 $employee,
@@ -95,12 +149,11 @@ class EmployeeController extends Controller
         } catch (ValidationException $e) {
             return redirect()->back()
                 ->withErrors($e->errors())
-                ->withInput()
-                ->with('edit_modal_open', true)
-                ->with('edit_employee_id_on_error', $employee->id);
+                ->withInput(); // Keep input and errors for repopulating the form
         } catch (\Exception $e) {
-            notify()->error('Failed to updated the record, please try again');
-            return redirect()->back();
+            notify()->error('Failed to update the record, please try again');
+            Log::error('Error updating employee: ' . $e->getMessage(), ['exception' => $e]);
+            return redirect()->back()->withInput();
         }
     }
 
@@ -109,12 +162,22 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee) // Route Model Binding (scoped by TenantScope)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Security check: Only allow delete if employee belongs to current tenant OR logged-in user is admin
+        if (!$user->isAdmin() && $employee->company_id !== $user->company_id) {
+            notify()->error('Unauthorized action on employee record.');
+            return redirect()->route('admin.employee.index');
+        }
+
         try {
             $this->employeeService->deleteEmployee($employee);
-            notify()->success('Employee deleted successfully!'); // Use notify()
+            notify()->success('Employee deleted successfully!');
             return redirect()->back();
         } catch (\Exception $e) {
             notify()->error('Failed to delete employee. Please try again.');
+            Log::error('Error deleting employee: ' . $e->getMessage(), ['exception' => $e]);
             return redirect()->back();
         }
     }
