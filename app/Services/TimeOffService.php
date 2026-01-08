@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\TimeOff;
 use App\Models\TimeOffBalance;
 use App\Models\TimeOffType;
+use App\Scopes\TenantScope;
 use App\Services\Interfaces\TimeOffServiceInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -15,14 +16,25 @@ use Illuminate\Support\Facades\Log;
 
 class TimeOffService implements TimeOffServiceInterface
 {
-    public function getPaginatedTimeOffs(?int $companyId, int $perPage = 10, array $filters = []): LengthAwarePaginator
+    public function getPaginatedTimeOffs(?int $companyId, int $perPage = 8, array $filters = []): LengthAwarePaginator
     {
-        $query = TimeOff::with(['employee.user', 'employee.department', 'type', 'approver.user']);
+        $query = TimeOff::query();
 
-        // Explicitly apply company_id filter ONLY if $companyId is provided.
-        // If $companyId is null (for admin), the TenantScope on TimeOff model will bypass the filter.
         if ($companyId !== null) {
             $query->where('company_id', $companyId);
+            $query->with(['employee.user', 'employee.department', 'type', 'approver.user']);
+        } else {
+            $query->withoutGlobalScope(\App\Scopes\TenantScope::class);
+
+            $query->with([
+                'employee' => function ($q) {
+                    $q->withoutGlobalScope(\App\Scopes\TenantScope::class)->with('user', 'department');
+                },
+                'type' => function ($q) {
+                    $q->withoutGlobalScope(\App\Scopes\TenantScope::class);
+                },
+                'approver.user'
+            ]);
         }
 
         if (isset($filters['status']) && $filters['status'] !== 'All') {
@@ -38,14 +50,26 @@ class TimeOffService implements TimeOffServiceInterface
     public function createTimeOff(array $data, int $companyId, int $requestingUserId): TimeOff
     {
         return DB::transaction(function () use ($data, $companyId, $requestingUserId) {
+            // Validate that employee and time-off type belong to the same company
+            $employee = Employee::withoutGlobalScope(TenantScope::class)
+                ->findOrFail($data['employee_id']);
+
+            $timeOffType = TimeOffType::withoutGlobalScope(TenantScope::class)
+                ->findOrFail($data['time_off_type_id']);
+
+            // Extra validation: ensure employee and type belong to the target company
+            if ($employee->company_id !== $companyId) {
+                throw new \InvalidArgumentException('The selected employee does not belong to the specified company.');
+            }
+
+            if ($timeOffType->company_id !== $companyId) {
+                throw new \InvalidArgumentException('The selected time-off type does not belong to the specified company.');
+            }
+
             $timeOff = TimeOff::create(array_merge($data, [
                 'company_id' => $companyId,
-                'status' => 'Pending', // New requests are always pending
-                // approver_id and approved_at are null initially
+                'status' => 'Pending',
             ]));
-
-            // TODO: Send notification to manager/approver
-            // event(new TimeOffRequested($timeOff));
 
             return $timeOff;
         });
@@ -54,7 +78,6 @@ class TimeOffService implements TimeOffServiceInterface
     public function updateTimeOff(TimeOff $timeOff, array $data, int $updatingUserId): TimeOff
     {
         return DB::transaction(function () use ($timeOff, $data, $updatingUserId) {
-            // If status is being changed to Rejected, ensure rejection_reason is provided
             if (isset($data['status']) && $data['status'] === 'Rejected' && empty($data['rejection_reason'])) {
                 throw new \InvalidArgumentException("Rejection reason is required when status is 'Rejected'.");
             }
@@ -64,27 +87,20 @@ class TimeOffService implements TimeOffServiceInterface
 
             $timeOff->fill($data);
 
-            // Handle balance updates based on status changes
             if ($originalStatus !== 'Approved' && $newStatus === 'Approved') {
-                // Request is now approved
                 $timeOff->approver_id = $updatingUserId;
                 $timeOff->approved_at = now();
-                $this->updateTimeOffBalance($timeOff, true); // Deduct days
+                $this->updateTimeOffBalance($timeOff, true);
             } elseif ($originalStatus === 'Approved' && $newStatus !== 'Approved') {
-                // An approved request is being changed (e.g., to Cancelled or Rejected)
-                $this->updateTimeOffBalance($timeOff, false); // Add days back
+                $this->updateTimeOffBalance($timeOff, false);
                 $timeOff->approver_id = $updatingUserId;
-                $timeOff->approved_at = now(); // Timestamp when changed
+                $timeOff->approved_at = now();
             } elseif ($newStatus === 'Rejected') {
-                // If status is changed to Rejected (and wasn't previously approved)
                 $timeOff->approver_id = $updatingUserId;
-                $timeOff->approved_at = now(); // Timestamp when rejected
+                $timeOff->approved_at = now();
             }
 
             $timeOff->save();
-
-            // TODO: Send notification if status changed
-
             return $timeOff;
         });
     }
@@ -92,25 +108,37 @@ class TimeOffService implements TimeOffServiceInterface
     public function deleteTimeOff(TimeOff $timeOff): bool
     {
         return DB::transaction(function () use ($timeOff) {
-            // If an approved time-off is deleted, revert the balance
             if ($timeOff->isApproved()) {
-                $this->updateTimeOffBalance($timeOff, false); // Add days back
+                $this->updateTimeOffBalance($timeOff, false);
             }
             return $timeOff->delete();
         });
     }
 
-    public function getTimeOffTypes(int $companyId): Collection
+    public function getTimeOffTypes(?int $companyId): Collection
     {
-        $types = TimeOffType::where('company_id', $companyId)->get();
+        $query = TimeOffType::query();
 
-        return $types;
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        } else {
+            $query->withoutGlobalScope(TenantScope::class);
+        }
+
+        return $query->get();
     }
 
-    public function getCompanyEmployees(int $companyId): Collection
+    public function getCompanyEmployees(?int $companyId): Collection
     {
+        $query = Employee::with(['user', 'department']);
 
-        return Employee::where('company_id', $companyId)->with('user', 'department')->get();
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        } else {
+            $query->withoutGlobalScope(TenantScope::class);
+        }
+
+        return $query->get();
     }
 
     public function approveTimeOff(TimeOff $timeOff, int $approverId): TimeOff
@@ -125,11 +153,7 @@ class TimeOffService implements TimeOffServiceInterface
             $timeOff->approved_at = now();
             $timeOff->save();
 
-            $this->updateTimeOffBalance($timeOff, true); // Deduct days
-
-            // TODO: Send notification
-            // event(new TimeOffApproved($timeOff));
-
+            $this->updateTimeOffBalance($timeOff, true);
             return $timeOff;
         });
     }
@@ -143,43 +167,40 @@ class TimeOffService implements TimeOffServiceInterface
         return DB::transaction(function () use ($timeOff, $approverId, $rejectionReason) {
             $timeOff->status = 'Rejected';
             $timeOff->approver_id = $approverId;
-            $timeOff->approved_at = now(); // Timestamp when rejected
+            $timeOff->approved_at = now();
             $timeOff->rejection_reason = $rejectionReason;
             $timeOff->save();
-
-            // TODO: Send notification
-            // event(new TimeOffRejected($timeOff));
-
             return $timeOff;
         });
     }
 
-    /**
-     * Helper to update time off balances.
-     * @param TimeOff $timeOff The time off request.
-     * @param bool $deduct If true, deducts days; if false, adds days back.
-     */
     protected function updateTimeOffBalance(TimeOff $timeOff, bool $deduct): void
     {
-        $balance = TimeOffBalance::firstOrNew([
-            'company_id' => $timeOff->company_id,
-            'employee_id' => $timeOff->employee_id,
-            'time_off_type_id' => $timeOff->time_off_type_id,
-            'year' => $timeOff->start_date->year,
-        ]);
+        // For super admins creating time-offs across companies,
+        // we need to bypass tenant scope when creating/updating balances
+        $balance = TimeOffBalance::withoutGlobalScope(TenantScope::class)
+            ->firstOrNew([
+                'company_id' => $timeOff->company_id,
+                'employee_id' => $timeOff->employee_id,
+                'time_off_type_id' => $timeOff->time_off_type_id,
+                'year' => $timeOff->start_date->year,
+            ]);
 
         if (!$balance->exists) {
-            $balance->allocated_days = $timeOff->type->default_days_per_year ?? 0;
-            $balance->days_taken = 0; // Initialize if new
+            // Load the type without scope to get default days
+            $type = TimeOffType::withoutGlobalScope(TenantScope::class)
+                ->find($timeOff->time_off_type_id);
+
+            $balance->allocated_days = $type->default_days_per_year ?? 0;
+            $balance->days_taken = 0;
         }
 
         if ($deduct) {
-            // Ensure days_taken doesn't exceed allocated_days if strict
             $balance->days_taken += $timeOff->total_days;
         } else {
-            // Ensure days_taken doesn't go below zero
             $balance->days_taken = max(0, $balance->days_taken - $timeOff->total_days);
         }
+
         $balance->save();
     }
 }

@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantScoped;
 
 class Department extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantScoped;
 
     /**
      * The attributes that are mass assignable.
@@ -35,27 +36,5 @@ class Department extends Model
     public function employees()
     {
         return $this->hasMany(Employee::class);
-    }
-
-    /**
-     * The "booted" method of the model.
-     *
-     * @return void
-     */
-    protected static function booted()
-    {
-
-        static::addGlobalScope('company', function (Builder $builder) {
-            if (app()->bound('tenant') && app('tenant') instanceof Company) {
-                $builder->where('company_id', app('tenant')->id);
-            }
-        });
-
-
-        static::creating(function ($department) {
-            if (app()->bound('tenant') && app('tenant') instanceof Company) {
-                $department->company_id = app('tenant')->id;
-            }
-        });
     }
 }

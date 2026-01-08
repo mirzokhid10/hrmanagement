@@ -13,10 +13,11 @@ class UpdateTimeOffRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Only authenticated users (admins/HR) can update time off requests.
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        return $user && $user->hasAnyRole(['admin', 'hr']);
+
+        // Super admins, admins, and HR can update time-off requests
+        return $user && ($user->isAdmin() || $user->hasAnyRole(['admin', 'hr']));
     }
 
     /**
@@ -24,43 +25,76 @@ class UpdateTimeOffRequest extends FormRequest
      */
     public function rules(): array
     {
-        $companyId = Auth::user()->company_id;
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        return [
-            'employee_id' => [
-                'required',
-                'integer',
-                Rule::exists('employees', 'id')->where(function ($query) use ($companyId) {
-                    return $query->where('company_id', $companyId);
-                }),
-            ],
-            'time_off_type_id' => [
-                'required',
-                'integer',
-                Rule::exists('time_off_types', 'id')->where(function ($query) use ($companyId) {
-                    return $query->where('company_id', $companyId);
-                }),
-            ],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'reason' => ['nullable', 'string', 'max:500'],
-            'status' => [
-                'required',
-                Rule::in(['Pending', 'Approved', 'Rejected', 'Cancelled']),
-            ],
-            'rejection_reason' => [
-                Rule::requiredIf($this->input('status') === 'Rejected'),
-                'nullable',
-                'string',
-                'max:500'
-            ],
-            'total_days' => ['required', 'numeric', 'min:0.5'], // <-- ADD THIS RULE
-        ];
+        // For super admins, skip company validation
+        // For regular users, validate against their company
+        if ($user->isAdmin()) {
+            return [
+                'employee_id' => [
+                    'required',
+                    'integer',
+                    'exists:employees,id',
+                ],
+                'time_off_type_id' => [
+                    'required',
+                    'integer',
+                    'exists:time_off_types,id',
+                ],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+                'reason' => ['nullable', 'string', 'max:500'],
+                'status' => [
+                    'required',
+                    Rule::in(['Pending', 'Approved', 'Rejected', 'Cancelled']),
+                ],
+                'rejection_reason' => [
+                    Rule::requiredIf($this->input('status') === 'Rejected'),
+                    'nullable',
+                    'string',
+                    'max:500'
+                ],
+                'total_days' => ['required', 'numeric', 'min:0.5'],
+            ];
+        } else {
+            $companyId = $user->company_id;
+
+            return [
+                'employee_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('employees', 'id')->where(function ($query) use ($companyId) {
+                        return $query->where('company_id', $companyId);
+                    }),
+                ],
+                'time_off_type_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('time_off_types', 'id')->where(function ($query) use ($companyId) {
+                        return $query->where('company_id', $companyId);
+                    }),
+                ],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+                'reason' => ['nullable', 'string', 'max:500'],
+                'status' => [
+                    'required',
+                    Rule::in(['Pending', 'Approved', 'Rejected', 'Cancelled']),
+                ],
+                'rejection_reason' => [
+                    Rule::requiredIf($this->input('status') === 'Rejected'),
+                    'nullable',
+                    'string',
+                    'max:500'
+                ],
+                'total_days' => ['required', 'numeric', 'min:0.5'],
+            ];
+        }
     }
 
     /**
      * Prepare the data for validation.
-     * Calculate total_days here.
      */
     protected function prepareForValidation(): void
     {
@@ -73,9 +107,11 @@ class UpdateTimeOffRequest extends FormRequest
                 $dtStartDate = new \DateTime($startDate);
                 $dtEndDate = new \DateTime($endDate);
                 $totalDays = $dtStartDate->diff($dtEndDate)->days + 1;
-            } catch (\Exception $e) { /* Handled by validation rules */
+            } catch (\Exception $e) {
+                // Validation will catch this
             }
         }
+
         $this->merge(['total_days' => $totalDays]);
     }
 
@@ -86,9 +122,9 @@ class UpdateTimeOffRequest extends FormRequest
     {
         return [
             'employee_id.required' => 'Please select an employee.',
-            'employee_id.exists' => 'The selected employee is invalid or does not belong to your company.',
+            'employee_id.exists' => 'The selected employee is invalid or does not belong to the selected company.',
             'time_off_type_id.required' => 'Please select a time off type.',
-            'time_off_type_id.exists' => 'The selected time off type is invalid or does not belong to your company.',
+            'time_off_type_id.exists' => 'The selected time off type is invalid or does not belong to the selected company.',
             'start_date.required' => 'The start date is required.',
             'end_date.required' => 'The end date is required.',
             'end_date.after_or_equal' => 'The end date must be after or equal to the start date.',

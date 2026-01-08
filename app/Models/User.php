@@ -35,8 +35,8 @@ class User extends Authenticatable
 
     protected static function booted(): void
     {
-
         static::creating(function ($user) {
+            // Only set company_id automatically if not super admin
             if (!$user->company_id && app()->bound('tenant') && app('tenant')) {
                 $user->company_id = app('tenant')->id;
             }
@@ -54,7 +54,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if this user is an admin.
+     * Check if this user is a super admin.
+     * Super admins can access all tenants and bypass tenant scoping.
      */
     public function isAdmin(): bool
     {
@@ -64,15 +65,50 @@ class User extends Authenticatable
     /**
      * Check if this user is an HR manager.
      */
-    public function isHRManager(): bool
+    public function isHR(): bool
     {
-        return $this->hasRole('hr'); // Changed from 'hr_manager' to 'hr'
+        return $this->hasRole('hr');
     }
 
     /**
-     * Admins can access all companies within the platform
+     * Check if user can access all companies (super admin only).
      */
     public function canAccessAllCompanies(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    /**
+     * Check if user can manage a specific company.
+     */
+    public function canManageCompany(Company $company): bool
+    {
+        // Super admin can manage all companies
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // Admin/HR can only manage their own company
+        return $this->company_id === $company->id && ($this->isAdmin() || $this->isHRManager());
+    }
+
+    /**
+     * Get the tenant (company) for this user.
+     * Returns null for super admins.
+     */
+    public function getTenant(): ?Company
+    {
+        if ($this->isAdmin()) {
+            return null; // Super admins don't belong to a tenant
+        }
+
+        return $this->company;
+    }
+
+    /**
+     * Check if user should bypass tenant scoping.
+     */
+    public function shouldBypassTenantScope(): bool
     {
         return $this->isAdmin();
     }

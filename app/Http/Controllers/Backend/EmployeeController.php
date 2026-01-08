@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Department; // Import Department model
 use App\Models\Employee;
 use App\Services\Interfaces\EmployeeServiceInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -37,11 +38,12 @@ class EmployeeController extends Controller
 
         $employees = $this->employeeService->getPaginatedEmployees($companyIdForQuery, $perPage, $searchTerm);
 
-        // For the index view, we might need departments/companies for filters or display.
-        // For non-admin, departments are scoped to their company. For admin, we could pass all or none.
-        // Given the original index, let's keep it simple: departments for the current user's company (if not admin).
         $departments = $user->company_id ? Department::where('company_id', $user->company_id)->get() : collect();
-        $companies = $user->isAdmin() ? Company::all() : collect(); // Only load all companies if admin
+        $companies = $user->isAdmin() ? Company::all() : collect();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return view('admin.employee.partials._employee_list', compact('employees', 'departments', 'searchTerm', 'companies'));
+        }
 
         return view('admin.employee.index', compact('employees', 'departments', 'searchTerm', 'companies'));
     }
@@ -54,14 +56,8 @@ class EmployeeController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        // Admin can choose a company, so pass all companies.
-        // For non-admins, the company is fixed.
         $companies = $user->isAdmin() ? Company::all() : collect([$user->company]);
 
-        // Departments will be pre-filtered if not admin, or initially empty/all if admin
-        // and relying on JS to update (which we're not doing now).
-        // For a non-JS admin form, if they select a company, they'd typically be redirected to a company-specific create form.
-        // For simplicity, if not admin, load their company's departments. If admin, load all departments.
         $departments = $user->isAdmin() ? Department::all() : ($user->company_id ? Department::where('company_id', $user->company_id)->get() : collect());
 
         return view('admin.employee.create', compact('departments', 'companies'));
@@ -180,5 +176,21 @@ class EmployeeController extends Controller
             Log::error('Error deleting employee: ' . $e->getMessage(), ['exception' => $e]);
             return redirect()->back();
         }
+    }
+
+    /**
+     * Fetch departments based on selected company (for dynamic dropdowns via AJAX).
+     */
+    public function getDepartmentsByCompany(Company $company): JsonResponse
+    {
+        // Ensure we get departments for this specific company
+        // We use withoutTenantScope() to bypass global scopes if you have them applied
+        $departments = $company->departments()
+            ->withoutTenantScope()
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json($departments);
     }
 }

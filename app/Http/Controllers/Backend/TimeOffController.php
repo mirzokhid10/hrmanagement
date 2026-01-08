@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Backend;
 
+use App\DataTables\TimeOffDataTable;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTimeOffRequest;
 use App\Http\Requests\UpdateTimeOffRequest;
@@ -13,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log; // For logging errors
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class TimeOffController extends Controller
@@ -28,68 +29,100 @@ class TimeOffController extends Controller
     /**
      * Display a listing of the time-off requests for the current company.
      */
-    public function index(Request $request): View
+    public function index(TimeOffDataTable $dataTable)
     {
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
+        $companyId = Auth::user()->company_id;
 
-        // Determine the company_id for filtering.
-        // If the user is an admin, pass null to the service, which means the TenantScope will bypass.
-        // Otherwise, pass the user's company_id for regular tenant-scoped filtering.
-        $companyIdForQuery = $user->isAdmin() ? null : $user->company_id;
+        $stats = [
+            'pending' => TimeOff::where('company_id', $companyId)->where('status', 'Pending')->count(),
+            'total' => TimeOff::where('company_id', $companyId)->count(),
+            'approved' => TimeOff::where('company_id', $companyId)->where('status', 'Approved')->count(),
+            'rejected' => TimeOff::where('company_id', $companyId)->where('status', 'Rejected')->count(),
+        ];
 
-        $filters = $request->only(['status', 'employee_id']);
-        $timeOffs = $this->timeOffService->getPaginatedTimeOffs($companyIdForQuery, 10, $filters);
-
-        $statuses = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
-
-        // For dropdowns (employees and time off types), these are typically scoped to the *current user's company*
-        // even if the admin is viewing all data. If an admin should filter by employees from *any* company
-        // in these dropdowns, those service methods would also need a nullable companyId parameter.
-        // For now, let's keep dropdowns scoped to the admin's own company as a default.
-        $employeesForDropdown = $this->timeOffService->getCompanyEmployees($user->company_id)
-            ->mapWithKeys(function ($employee) {
-                return [$employee->id => ($employee->full_name . ' (' . ($employee->job_title ?? 'N/A Job Title') . ')')];
-            })->sort();
-
-        $timeOffTypesForDropdown = $this->timeOffService->getTimeOffTypes($user->company_id);
-
-        return view('admin.time-offs.index', compact('timeOffs', 'statuses', 'employeesForDropdown', 'timeOffTypesForDropdown'));
+        return $dataTable->render('admin.time-offs.index', compact('stats'));
     }
 
     /**
-     * Show the form for creating a new time-off request (by admin/HR on behalf of employee).
-     * Since creation is via modal, this method can redirect or return an empty response.
+     * Show the form for creating a new time-off request.
      */
-    public function create(): RedirectResponse
+    public function create()
     {
-        return redirect()->route('admin.time-offs.index');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $companyId = $user->company_id;
+
+        $companies = [];
+        $departments = [];
+        $employees = [];
+        $types = [];
+
+        // Super Admin - can see all companies
+        if ($user->isAdmin()) {
+            $companies = \App\Models\Company::query()
+                ->withoutGlobalScopes()
+                ->where('is_active', true)
+                ->pluck('name', 'id');
+        }
+        // Regular User (Admin/HR/Employee)
+        else {
+            $departments = \App\Models\Department::where('company_id', $companyId)->pluck('name', 'id');
+
+            $employees = \App\Models\Employee::where('company_id', $companyId)
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->id => $item->first_name . ' ' . $item->last_name];
+                });
+
+            $types = \App\Models\TimeOffType::where('company_id', $companyId)->get();
+        }
+
+        return view('admin.time-offs.create', compact('companies', 'departments', 'employees', 'types'));
     }
 
     /**
      * Store a newly created time-off request.
      */
-    public function store(StoreTimeOffRequest $request): RedirectResponse
+    public function store(StoreTimeOffRequest $request)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $companyId = null;
+
+        // Check if company_id was provided in the form (super admin selection)
+        if ($request->has('company_id') && $request->company_id) {
+            // Super admin selected a company from dropdown
+            $companyId = $request->company_id;
+        } elseif ($user->isAdmin() || $user->hasRole('admin')) {
+            // Super admin but no company selected - get from employee
+            if ($request->has('employee_id')) {
+                $employee = \App\Models\Employee::withoutGlobalScope(\App\Scopes\TenantScope::class)
+                    ->find($request->employee_id);
+
+                if ($employee) {
+                    $companyId = $employee->company_id;
+                }
+            }
+        } else {
+            // Regular user - use their company_id
+            $companyId = $user->company_id;
+        }
+
+        // Final validation - company_id must be set
+        if (!$companyId) {
+
+            notify()->error('Unable to determine company for this request. Please select a company.');
+            return back()->withInput();
+        }
+
         try {
-            $this->timeOffService->createTimeOff(
-                $request->validated(),
-                Auth::user()->company_id,
-                Auth::id() // User who is creating the request
-            );
-            notify()->success('Time-off request created successfully!');
+            $this->timeOffService->createTimeOff($request->validated(), $companyId, Auth::id());
+            notify()->success('Leave request created successfully.');
             return redirect()->route('admin.time-offs.index');
-        } catch (ValidationException $e) {
-            Log::error('Validation failed for time-off store: ' . $e->getMessage(), ['errors' => $e->errors(), 'input' => $request->all()]);
-            notify()->error('Validation failed. Please check your input.');
-            return redirect()->back()
-                ->withErrors($e->errors())
-                ->withInput()
-                ->with('add_time_off_modal_open_on_error', true); // Flash flag to reopen ADD modal
         } catch (\Exception $e) {
-            Log::error('Failed to create time-off request: ' . $e->getMessage(), ['exception' => $e]);
-            notify()->error('Failed to create time-off request. Please try again.');
-            return redirect()->back()->withInput();
+            notify()->error('Failed to create leave request: ' . $e->getMessage());
+            return back()->withInput();
         }
     }
 
@@ -109,75 +142,114 @@ class TimeOffController extends Controller
 
     /**
      * Show the form for editing the specified time-off request.
-     * Returns JSON for AJAX requests to populate modal.
      */
-    public function edit(TimeOff $timeOff): JsonResponse|View
+    public function edit(TimeOff $timeOff)
     {
-        // For AJAX requests (to populate the modal)
-        if (request()->ajax() || request()->wantsJson()) {
-            $data = $timeOff->load(['employee', 'type'])->toArray();
-            $data['start_date'] = $timeOff->start_date->format('Y-m-d');
-            $data['end_date'] = $timeOff->end_date->format('Y-m-d');
-            return response()->json($data);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 1. Security Check: Ensure user can only edit time-offs for their own company
+        if (!$user->isAdmin() && $user->company_id !== $timeOff->company_id) {
+            notify()->error('You do not have permission to edit this leave request.');
+            return redirect()->route('admin.time-offs.index');
         }
 
-        // Fallback for non-AJAX requests (if you had a dedicated edit page)
-        $companyId = Auth::user()->company_id;
-        $timeOffTypes = $this->timeOffService->getTimeOffTypes($companyId);
-        $employees = $this->timeOffService->getCompanyEmployees($companyId)
-            ->mapWithKeys(function ($employee) {
-                return [$employee->id => $employee->name . ' (' . ($employee->job_title ?? 'N/A Position') . ')'];
-            })->sort();
+        // 2. Determine target company for data fetching
+        $targetCompanyId = $timeOff->company_id;
 
-        return view('admin.time-offs.edit', compact('timeOff', 'timeOffTypes', 'employees'));
+        $companies = [];
+        $departments = [];
+        $employees = [];
+        $types = [];
+
+        // 3. Data Fetching Strategy
+        if ($user->isAdmin()) {
+            // === SCENARIO A: SUPER ADMIN ===
+
+            // Fetch ALL companies for the company dropdown
+            $companies = \App\Models\Company::query()
+                ->withoutGlobalScopes() // Bypass tenant scope
+                ->where('is_active', true)
+                ->pluck('name', 'id');
+
+
+            $departments = \App\Models\Department::query()
+                ->withoutGlobalScope(\App\Scopes\TenantScope::class)
+                ->where('company_id', $targetCompanyId)
+                ->pluck('name', 'id');
+
+            $employees = \App\Models\Employee::query()
+                ->withoutGlobalScope(\App\Scopes\TenantScope::class)
+                ->where('company_id', $targetCompanyId)
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->id => $item->first_name . ' ' . $item->last_name];
+                });
+
+            $types = \App\Models\TimeOffType::query()
+                ->withoutGlobalScope(\App\Scopes\TenantScope::class)
+                ->where('company_id', $targetCompanyId)
+                ->get();
+        } else {
+            // === SCENARIO B: REGULAR USER (Standard Tenant Scope) ===
+
+            // Standard queries automatically apply the TenantScope based on Auth user
+            $departments = \App\Models\Department::where('company_id', $targetCompanyId)->pluck('name', 'id');
+
+            $employees = \App\Models\Employee::where('company_id', $targetCompanyId)
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->id => $item->first_name . ' ' . $item->last_name];
+                });
+
+            $types = \App\Models\TimeOffType::where('company_id', $targetCompanyId)->get();
+        }
+
+        return view('admin.time-offs.edit', compact('timeOff', 'companies', 'departments', 'employees', 'types'));
     }
 
-    /**
-     * Update the specified time-off request.
-     */
-    public function update(UpdateTimeOffRequest $request, TimeOff $timeOff): RedirectResponse
+    public function update(UpdateTimeOffRequest $request, TimeOff $timeOff)
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // 1. Authorization Check (Redundant if handled in Request, but good for safety)
+        if (!$user->isAdmin() && $user->company_id !== $timeOff->company_id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // 2. Handle Company ID Logic for Super Admins
+        // If Super Admin changes the company in the dropdown, we need to respect that.
+        // If not provided (or regular user), we keep the existing company_id.
+        $data = $request->validated();
+
+        if ($user->isAdmin()) {
+            // If the form submitted a company_id, use it.
+            // Otherwise, keep the original record's company_id.
+            if (!isset($data['company_id'])) {
+                $data['company_id'] = $timeOff->company_id;
+            }
+        } else {
+            // Regular users cannot change the company
+            $data['company_id'] = $user->company_id;
+        }
+
         try {
-            $this->timeOffService->updateTimeOff(
-                $timeOff,
-                $request->validated(),
-                Auth::id() // User who is updating the request
-            );
-            notify()->success('Time-off request updated successfully!');
+            $this->timeOffService->updateTimeOff($timeOff, $data, Auth::id());
+
+            notify()->success('Leave request updated successfully.');
             return redirect()->route('admin.time-offs.index');
-        } catch (ValidationException $e) {
-            Log::error('Validation failed for time-off update (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['errors' => $e->errors(), 'input' => $request->all()]);
-            notify()->error('Validation failed. Please check your input.');
-            return redirect()->back()
-                ->withErrors($e->errors())
-                ->withInput()
-                ->with('edit_time_off_modal_open_on_error', true) // Flash flag to reopen EDIT modal
-                ->with('edit_time_off_id_on_error', $timeOff->id); // Flash ID to re-fetch data
-        } catch (\InvalidArgumentException $e) {
-            Log::error('Invalid argument for time-off update (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['exception' => $e]);
-            notify()->error($e->getMessage());
-            return redirect()->back()->withInput();
         } catch (\Exception $e) {
-            Log::error('Failed to update time-off request (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['exception' => $e]);
-            notify()->error('Failed to update time-off request. Please try again.');
-            return redirect()->back()->withInput();
+            Log::error('Failed to update time off: ' . $e->getMessage());
+            notify()->error('Failed to update leave request: ' . $e->getMessage());
+            return back()->withInput();
         }
     }
 
-    /**
-     * Remove the specified time-off request.
-     */
-    public function destroy(TimeOff $timeOff): RedirectResponse
+    public function destroy(TimeOff $timeOff)
     {
-        try {
-            $this->timeOffService->deleteTimeOff($timeOff);
-            notify()->success('Time-off request deleted successfully!');
-            return redirect()->route('admin.time-offs.index');
-        } catch (\Exception $e) {
-            Log::error('Failed to delete time-off request (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['exception' => $e]);
-            notify()->error('Failed to delete time-off request. Please try again.');
-            return redirect()->back();
-        }
+        $this->timeOffService->deleteTimeOff($timeOff);
+        return redirect()->route('admin.time-offs.index')->with('success', 'Leave request deleted successfully.');
     }
 
     /**
@@ -225,11 +297,10 @@ class TimeOffController extends Controller
     }
 
     /**
-     * Update the status of the specified time-off request (e.g., cancel).
+     * Update the status of the specified time-off request.
      */
     public function updateStatus(Request $request, TimeOff $timeOff): JsonResponse
     {
-        // Basic validation for the new status
         $request->validate([
             'status' => ['required', Rule::in(['Pending', 'Approved', 'Rejected', 'Cancelled'])],
             'rejection_reason' => [
@@ -245,24 +316,28 @@ class TimeOffController extends Controller
             $rejectionReason = $request->input('rejection_reason');
             $approverId = Auth::id();
 
-            // Use the TimeOffService to handle the status change
-            // The updateTimeOff method in your service can handle this robustly,
-            // including balance adjustments if status changes to/from 'Approved'.
             $updatedTimeOff = $this->timeOffService->updateTimeOff(
                 $timeOff,
                 ['status' => $newStatus, 'rejection_reason' => $rejectionReason],
                 $approverId
             );
 
-            // If the service's updateTimeOff doesn't set approver_id/approved_at for non-approve/reject directly,
-            // you might need explicit calls or ensure your service handles all status changes.
-            // For simplicity, if updateTimeOff is robust, this should be enough.
-
             notify()->success("Time-off request status changed to {$newStatus} successfully!");
-            return response()->json(['success' => true, 'message' => 'Status updated successfully.', 'new_status' => $updatedTimeOff->status]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Status updated successfully.',
+                'new_status' => $updatedTimeOff->status
+            ]);
         } catch (ValidationException $e) {
-            Log::error('Validation failed for time-off status update (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['errors' => $e->errors(), 'input' => $request->all()]);
-            return response()->json(['success' => false, 'message' => 'Validation failed: ' . $e->getMessage(), 'errors' => $e->errors()], 422);
+            Log::error('Validation failed for time-off status update (ID: ' . $timeOff->id . '): ' . $e->getMessage(), [
+                'errors' => $e->errors(),
+                'input' => $request->all()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed: ' . $e->getMessage(),
+                'errors' => $e->errors()
+            ], 422);
         } catch (\InvalidArgumentException $e) {
             Log::warning('Invalid argument for time-off status update (ID: ' . $timeOff->id . '): ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
@@ -270,5 +345,111 @@ class TimeOffController extends Controller
             Log::error('An error occurred while updating time-off status (ID: ' . $timeOff->id . '): ' . $e->getMessage(), ['exception' => $e]);
             return response()->json(['success' => false, 'message' => 'An unexpected error occurred. Please try again.'], 500);
         }
+    }
+
+    /**
+     * AJAX: Get departments for a specific company.
+     * Used when super admin selects a company in the time-off form.
+     */
+    public function getDepartments($companyId)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        // Security check: Super admins can access any company, regular users only their own
+        if (!$user->isAdmin() && $user->company_id != $companyId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = \App\Models\Department::query();
+
+        // CRITICAL FIX: Super admins need to bypass tenant scope to see other companies' data
+        if ($user->isAdmin()) {
+            $query->withoutGlobalScope(\App\Scopes\TenantScope::class);
+        }
+
+        $departments = $query->where('company_id', $companyId)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        Log::info('getDepartments called', [
+            'user_id' => $user->id,
+            'is_super_admin' => $user->isAdmin(),
+            'requested_company_id' => $companyId,
+            'departments_count' => $departments->count()
+        ]);
+
+        return response()->json($departments);
+    }
+
+    /**
+     * AJAX: Get employees and time-off types based on company and/or department.
+     * Used when super admin selects a company or when anyone selects a department.
+     */
+    public function getEmployees(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $companyId = $request->company_id;
+        $departmentId = $request->department_id;
+
+        // Security check for non-super admins
+        if (!$user->isAdmin() && $user->company_id != $companyId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // 1. Get Employees
+        $employeeQuery = \App\Models\Employee::query();
+
+        // CRITICAL FIX: Super admins bypass tenant scope
+        if ($user->isAdmin()) {
+            $employeeQuery->withoutGlobalScope(\App\Scopes\TenantScope::class);
+        }
+
+        if ($companyId) {
+            $employeeQuery->where('company_id', $companyId);
+        }
+
+        if ($departmentId) {
+            $employeeQuery->where('department_id', $departmentId);
+        }
+
+        $employees = $employeeQuery->select('id', 'first_name', 'last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function ($emp) {
+                return [
+                    'id' => $emp->id,
+                    'name' => $emp->first_name . ' ' . $emp->last_name
+                ];
+            });
+
+        // 2. Get Time Off Types
+        $typeQuery = \App\Models\TimeOffType::query();
+
+        // CRITICAL FIX: Super admins bypass tenant scope for time-off types too
+        if ($user->isAdmin()) {
+            $typeQuery->withoutGlobalScope(\App\Scopes\TenantScope::class);
+        }
+
+        $types = $typeQuery->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get();
+
+        Log::info('getEmployees called', [
+            'user_id' => $user->id,
+            'is_super_admin' => $user->isAdmin(),
+            'requested_company_id' => $companyId,
+            'department_id' => $departmentId,
+            'employees_count' => $employees->count(),
+            'types_count' => $types->count()
+        ]);
+
+        return response()->json([
+            'employees' => $employees,
+            'types' => $types
+        ]);
     }
 }

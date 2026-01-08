@@ -12,8 +12,8 @@ interface TimeOffServiceInterface
     public function createTimeOff(array $data, int $companyId, int $requestingUserId): TimeOff;
     public function updateTimeOff(TimeOff $timeOff, array $data, int $updatingUserId): TimeOff;
     public function deleteTimeOff(TimeOff $timeOff): bool;
-    public function getTimeOffTypes(int $companyId): Collection;
-    public function getCompanyEmployees(int $companyId): Collection;
+    public function getTimeOffTypes(?int $companyId): Collection;
+    public function getCompanyEmployees(?int $companyId): Collection;
     public function approveTimeOff(TimeOff $timeOff, int $approverId): TimeOff;
     public function rejectTimeOff(TimeOff $timeOff, int $approverId, string $rejectionReason): TimeOff;
 }

@@ -8,6 +8,7 @@ use App\Services\Interfaces\TimeOffServiceInterface; // <-- Add this import
 use App\Services\TimeOffService;
 use App\Services\Interfaces\EmployeeServiceInterface;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\View;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -28,5 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Tell Laravel to use Bootstrap 5 for pagination links
         Paginator::useBootstrapFive();
+
+        View::composer('*', function ($view) {
+            $tenant = app()->has('tenant') ? app('tenant') : null;
+            $view->with('currentTenant', $tenant);
+        });
     }
 }

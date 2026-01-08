@@ -86,12 +86,12 @@
                         <div class="mb-3 col-md-4">
                             <label for="company_id" class="form-label">Company <span class="text-danger">*</span></label>
                             <select class="form-control @error('company_id') is-invalid @enderror" id="company_id"
-                                name="company_id" required>
+                                name="company_id" required onchange="loadDepartments(this.value)"> {{-- Trigger JS function --}}
                                 <option value="">Select Company</option>
                                 @foreach ($companies as $company)
                                     <option value="{{ $company->id }}"
-                                        {{ old('company_id', $employee->company_id) == $company->id ? 'selected' : '' }}>
-                                        {{ $company->name }} ({{ $company->subdomain }})
+                                        {{ old('company_id') == $company->id ? 'selected' : '' }}>
+                                        {{ $company->name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -111,17 +111,16 @@
                     @endif
 
                     <div class="col-md-4 mb-3">
-                        <label for="edit_department" class="form-label">Department <span
-                                class="text-danger">*</span></label>
+                        <label for="department" class="form-label">Department <span class="text-danger">*</span></label>
                         <select class="form-select @error('department_id') is-invalid @enderror" name="department_id"
-                            id="edit_department">
-                            <option value="" selected disabled>Select Department</option>
-                            @foreach ($departments as $department)
-                                <option value="{{ $department->id }}"
-                                    {{ old('department_id', $employee->department_id) == $department->id ? 'selected' : '' }}>
-                                    {{ $department->name }}
-                                </option>
-                            @endforeach
+                            id="department">
+                            <option value="" selected disabled>Select Company First</option>
+
+                            @if (!Auth::user()->isAdmin())
+                                @foreach ($departments as $department)
+                                    <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                @endforeach
+                            @endif
                         </select>
                         @error('department_id')
                             <div class="invalid-feedback">{{ $message }}</div>
@@ -225,3 +224,66 @@
         </div>
     </div>
 @endsection
+
+
+@push('scripts')
+    {{-- Assuming you have a stack named 'scripts' in your layout --}}
+    <script>
+        function loadDepartments(companyId) {
+            const departmentSelect = document.getElementById('department');
+
+            // Reset dropdown
+            departmentSelect.innerHTML = '<option value="" selected disabled>Loading...</option>';
+            departmentSelect.disabled = true;
+
+            if (!companyId) {
+                departmentSelect.innerHTML = '<option value="" selected disabled>Select Company First</option>';
+                return;
+            }
+
+            // Fetch data
+            fetch(`/admin/companies/${companyId}/departments`)
+                .then(response => response.json())
+                .then(data => {
+                    departmentSelect.innerHTML = '<option value="" selected disabled>Select Department</option>';
+
+                    if (data.length === 0) {
+                        departmentSelect.innerHTML += '<option value="" disabled>No departments found</option>';
+                    }
+
+                    data.forEach(dept => {
+                        let option = document.createElement('option');
+                        option.value = dept.id;
+                        option.text = dept.name;
+                        departmentSelect.appendChild(option);
+                    });
+
+                    departmentSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    departmentSelect.innerHTML =
+                        '<option value="" selected disabled>Error loading departments</option>';
+                });
+        }
+
+        // Trigger on page load if a company is already selected (e.g. after validation error)
+        document.addEventListener("DOMContentLoaded", function() {
+            const companyId = document.getElementById('company_id')?.value;
+            const oldDepartmentId = "{{ old('department_id') }}"; // Get previous value if validation failed
+
+            if (companyId && "{{ Auth::user()->isAdmin() }}") {
+                loadDepartments(companyId);
+
+                // Wait a moment for fetch to finish, then re-select the old department
+                // (In a real production app, we would handle this promise chain better,
+                // but this works for simple cases)
+                setTimeout(() => {
+                    if (oldDepartmentId) {
+                        document.getElementById('department').value = oldDepartmentId;
+                    }
+                }, 500);
+            }
+        });
+    </script>
+@endpush

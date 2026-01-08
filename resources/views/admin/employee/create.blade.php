@@ -90,12 +90,12 @@
                         <div class="mb-3 col-md-4">
                             <label for="company_id" class="form-label">Company <span class="text-danger">*</span></label>
                             <select class="form-control @error('company_id') is-invalid @enderror" id="company_id"
-                                name="company_id" required>
+                                name="company_id" required onchange="loadDepartments(this.value)"> {{-- Trigger JS function --}}
                                 <option value="">Select Company</option>
                                 @foreach ($companies as $company)
                                     <option value="{{ $company->id }}"
                                         {{ old('company_id') == $company->id ? 'selected' : '' }}>
-                                        {{ $company->name }} ({{ $company->subdomain }})
+                                        {{ $company->name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -104,27 +104,36 @@
                             @enderror
                         </div>
                     @endif
+                    {{-- For non-admins, show the company but make it read-only --}}
+                    <div class="mb-3 col-md-4">
+                        <label for="company_name" class="form-label">Company</label>
+                        <input type="text" class="form-control" id="company_name" value="{{ $employee->company->name }}"
+                            readonly disabled>
+                        {{-- Keep a hidden field for the company_id if the backend expects it --}}
+                        <input type="hidden" name="company_id" value="{{ $employee->company_id }}">
+                    </div>
+                    @endif
                 </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="department" class="form-label">Department <span class="text-danger">*</span></label>
                         <select class="form-select @error('department_id') is-invalid @enderror" name="department_id"
                             id="department">
-                            <option value="" selected disabled>Select Department</option>
-                            {{-- Departments are passed from the controller --}}
-                            @foreach ($departments as $department)
-                                <option value="{{ $department->id }}"
-                                    {{ old('department_id') == $department->id ? 'selected' : '' }}>
-                                    {{ $department->name }}
-                                </option>
-                            @endforeach
+                            <option value="" selected disabled>Select Company First</option>
+
+                            @if (!Auth::user()->isAdmin())
+                                @foreach ($departments as $department)
+                                    <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                @endforeach
+                            @endif
                         </select>
                         @error('department_id')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label for="designation" class="form-label">Designation <span class="text-danger">*</span></label>
+                        <label for="designation" class="form-label">Designation <span
+                                class="text-danger">*</span></label>
                         <input type="text" name="job_title"
                             class="form-control @error('job_title') is-invalid @enderror" id="designation"
                             placeholder="e.g. Software Engineer" value="{{ old('job_title') }}">

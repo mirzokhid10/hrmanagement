@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
-use App\Scopes\TenantScope; // Assuming you apply TenantScope
+use App\Traits\TenantScoped;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\App;
+
 
 class TimeOffBalance extends Model
 {
     /** @use HasFactory<\Database\Factories\TimeOffBalanceFactory> */
-    use HasFactory;
+    use HasFactory, TenantScoped; // <-- Add trait
 
     protected $fillable = [
         'company_id',
@@ -28,21 +28,6 @@ class TimeOffBalance extends Model
         'allocated_days' => 'decimal:1',
         'days_taken' => 'decimal:1',
     ];
-
-    /**
-     * The "booted" method of the model.
-     * Apply TenantScope automatically.
-     */
-    protected static function booted(): void
-    {
-        static::addGlobalScope(new TenantScope);
-
-        static::creating(function (TimeOffBalance $timeOffBalance) {
-            if (App::bound('tenant') && App::get('tenant') instanceof Company) {
-                $timeOffBalance->company_id = App::get('tenant')->id;
-            }
-        });
-    }
 
     public function company(): BelongsTo
     {

@@ -75,6 +75,10 @@
 
     <!-- end::GXON Required Stylesheet -->
 
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.bootstrap5.min.css">
+    <!-- End DataTables CSS -->
 
     <!-- begin:: Fontawesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
@@ -171,10 +175,10 @@
 
     <!-- Add notification component -->
     <x-notify::notify />
-
     <!-- Add Laravel Notify JavaScript -->
     @notifyJs
     <!-- begin::GXON Page Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="{{ asset('assets/libs/global/global.min.js') }}"></script>
     <script src="{{ asset('assets/libs/sortable/Sortable.min.js') }}"></script>
     <script src="{{ asset('assets/libs/chartjs/chart.js') }}"></script>
@@ -186,6 +190,13 @@
     <script src="{{ asset('assets/js/appSettings.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
 
+    <!-- jQuery and DataTables JS -->
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.min.js"></script>
+    <!-- End jQuery and DataTables JS -->
+
+
+
+    @stack('scripts')
     <!-- end::GXON Page Scripts -->
 </body>
 

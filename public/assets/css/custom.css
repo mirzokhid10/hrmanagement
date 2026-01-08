@@ -111,3 +111,34 @@ hr {
     background-color: #ff8110 !important;
     border-color: #ff8110 !important;
 }
+
+.breadcrumb-item + .breadcrumb-item::before {
+    float: left;
+    padding-right: var(--bs-breadcrumb-item-padding-x);
+    color: var(--bs-breadcrumb-divider-color);
+    content: var(--bs-breadcrumb-divider, "/") !important;
+}
+
+.btn-success {
+    color: #ffffff !important;
+    background-color: #22b07e !important;
+    border-color: #22b07e !important;
+}
+
+.dt-paging {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: end !important;
+    padding: 10px 0 0 0;
+}
+
+.badge {
+    line-height: 1.5;
+    block-size: 26px;
+    min-inline-size: 26px;
+    padding: 2px 10px !important;
+}
+
+.fs-14 {
+    font-size: 14px !important;
+}
