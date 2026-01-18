@@ -24,6 +24,13 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
+                                        <a href="{{ route('admin.document.index', $employee->id) }}"
+                                            class="dropdown-item edit-employee-btn">
+                                            Docs
+                                        </a>
+                                    </li>
+
+                                    <li>
                                         <a href="{{ route('admin.employee.edit', $employee->id) }}"
                                             class="dropdown-item edit-employee-btn"> Edit
                                         </a>

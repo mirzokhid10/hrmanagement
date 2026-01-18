@@ -34,22 +34,30 @@
                         </a>
                     </li>
                     <li class="menu-item">
-                        <a class="menu-link" href="">
+                        <a class="menu-link" href="{{ route('admin.attendance.index') }}">
                             <span class="menu-label">Attendance</span>
                         </a>
                     </li>
+
                     <li class="menu-item">
-                        <a class="menu-link" href="leave.html">
-                            <span class="menu-label">Leave</span>
+                        <a class="menu-link" href="{{ route('admin.document.policies') }}">
+                            <span class="menu-label">Company Policies</span>
                         </a>
                     </li>
+
+                    {{-- <li class="menu-item">
+                        <a class="menu-link" href="{{ route('admin.document.index') }}">
+                            <span class="menu-label">Company Policies</span>
+                        </a>
+                    </li> --}}
+
                     <li class="menu-item">
                         <a class="menu-link" href="payroll.html">
                             <span class="menu-label">Payroll</span>
                         </a>
                     </li>
                     <li class="menu-item">
-                        <a class="menu-link" href="recruitment.html">
+                        <a class="menu-link" href="{{ route('admin.recruitment.index') }}">
                             <span class="menu-label">Recruitment</span>
                         </a>
                     </li>
@@ -66,7 +74,21 @@
                 </ul>
             </li>
             <li class="menu-heading">
-                <span class="menu-label">Apps & Pages</span>
+                <span class="menu-label">Office Settings</span>
+            </li>
+
+            <li class="menu-item menu-arrow">
+                <a class="menu-link" href="javascript:void(0);" role="button">
+                    <i class="fa-solid fa-table-cells-large"></i>
+                    <span class="menu-label">Office Settings</span>
+                </a>
+                <ul class="menu-inner">
+                    <li class="menu-item">
+                        <a class="menu-link" href="{{ route('admin.office-location.index') }}">
+                            <span class="menu-label">Office Location</span>
+                        </a>
+                    </li>
+                </ul>
             </li>
             <li class="menu-item">
                 <a class="menu-link" href="chat.html">

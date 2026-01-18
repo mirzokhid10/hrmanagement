@@ -77,8 +77,8 @@ return [
     */
     'telegram' => [
         'enabled' => env('TELEGRAM_ENABLED', false),
-        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
-        'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+        'bot_token' => env('8493407707:AAEH10D_Lp2_dKWslv4tODd06S96CxGA3lQ'),
+        'webhook_url' => env('http://onboard.test:8000/api/telegram/webhook'),
     ],
 
     /*

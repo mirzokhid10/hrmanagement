@@ -25,7 +25,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'tenant' => TenantMiddleware::class, // <-- Add this so you can use it in routes
             'admin' => AdminMiddleware::class,
+
         ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'telegram/webhook', // This must match your Route URI exactly
+        ]);
+
 
         // Add TenantMiddleware to the 'web' group globally
         // This ensures all web routes automatically have tenant context
@@ -33,6 +39,4 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\TenantMiddleware::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
-    })->create();
+    ->withExceptions(function (Exceptions $exceptions): void {})->create();

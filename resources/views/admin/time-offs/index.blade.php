@@ -30,61 +30,72 @@
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div class="clearfix ps-2">
                         <div class="d-flex text-dark align-items-end gap-1 lh-1 mb-1">
-                            <span class="fs-2 fw-bold">1192</span>
-                            <span class="mb-1">/1206</span>
+                            {{-- Dynamic Present Count --}}
+                            <span class="fs-2 fw-bold">{{ $stats['present_today'] }}</span>
+                            <span class="mb-1">/{{ $stats['total_employees'] }}</span>
                         </div>
                         <span class="text-primary">Today Presents</span>
                     </div>
                     <div class="clearfix">
-                        <div id="leavesPresentsScore"></div>
+                        {{-- Pass percentage to JS for chart --}}
+                        <div id="leavesPresentsScore"
+                            data-percent="{{ $stats['total_employees'] > 0 ? round(($stats['present_today'] / $stats['total_employees']) * 100) : 0 }}">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        {{-- 2. Planned Leaves --}}
         <div class="col-xxl-3 col-md-6">
             <div class="card card-action action-border-danger">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div class="clearfix ps-2">
                         <div class="d-flex text-dark align-items-end gap-1 lh-1 mb-1">
-                            <span class="fs-2 fw-bold">128</span>
-                            <span class="mb-1">1206</span>
+                            <span class="fs-2 fw-bold">{{ $stats['planned_today'] }}</span>
+                            <span class="mb-1">/{{ $stats['total_employees'] }}</span>
                         </div>
-                        <span class="text-danger">Planned Leaves</span>
+                        <span class="text-danger">Planned Leaves (Today)</span>
                     </div>
                     <div class="clearfix">
-                        <div id="leavesPlannedScore"></div>
+                        <div id="leavesPlannedScore"
+                            data-percent="{{ $stats['total_employees'] > 0 ? round(($stats['planned_today'] / $stats['total_employees']) * 100) : 0 }}">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        {{-- 3. Unplanned Leaves --}}
         <div class="col-xxl-3 col-md-6">
             <div class="card card-action action-border-info">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div class="clearfix ps-2">
                         <div class="d-flex text-dark align-items-end gap-1 lh-1 mb-1">
-                            <span class="fs-2 fw-bold">12</span>
-                            <span class="mb-1">/1206</span>
+                            <span class="fs-2 fw-bold">{{ $stats['unplanned_today'] }}</span>
+                            <span class="mb-1">/{{ $stats['total_employees'] }}</span>
                         </div>
-                        <span class="text-info">Unplanned Leaves</span>
+                        <span class="text-info">Unplanned/Sick (Today)</span>
                     </div>
                     <div class="clearfix">
-                        <div id="leavesUnplannedScore"></div>
+                        <div id="leavesUnplannedScore"
+                            data-percent="{{ $stats['total_employees'] > 0 ? round(($stats['unplanned_today'] / $stats['total_employees']) * 100) : 0 }}">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        {{-- 4. Pending Requests --}}
         <div class="col-xxl-3 col-md-6">
             <div class="card card-action action-border-secondary">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <div class="clearfix ps-2">
                         <div class="d-flex text-dark align-items-end gap-1 lh-1 mb-1">
-                            <span class="fs-2 fw-bold">{{ $stats['pending'] }}</span>
-                            <span class="mb-1">/{{ $stats['total'] }}</span> Total from current pagination
+                            <span class="fs-2 fw-bold">{{ $stats['pending_total'] }}</span>
+                            <span class="mb-1">Requests</span>
                         </div>
-                        <span class="text-secondary">Pending Requests</span>
+                        <span class="text-secondary">Pending Action</span>
                     </div>
                     <div class="clearfix">
                         <div id="leavesPendingScore"></div>

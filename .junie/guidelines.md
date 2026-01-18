@@ -11,6 +11,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - php - 8.2.12
 - laravel/framework (LARAVEL) - v12
 - laravel/prompts (PROMPTS) - v0
+- laravel/telescope (TELESCOPE) - v5
 - livewire/livewire (LIVEWIRE) - v3
 - laravel/breeze (BREEZE) - v2
 - laravel/mcp (MCP) - v0

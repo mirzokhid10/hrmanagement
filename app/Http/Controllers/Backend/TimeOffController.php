@@ -16,6 +16,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
+use App\Models\Employee;
 
 class TimeOffController extends Controller
 {
@@ -31,17 +33,74 @@ class TimeOffController extends Controller
      */
     public function index(TimeOffDataTable $dataTable)
     {
-        $companyId = Auth::user()->company_id;
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $today = \Carbon\Carbon::today();
 
+        // HELPER: Create a function to get the correct base query
+        // This avoids repeating the "if admin" logic 5 times
+        $query = function ($model) use ($user) {
+            $q = $model::query();
+
+            if ($user->isAdmin()) {
+                // Super Admin: See ALL data (Bypass TenantScope)
+                return $q->withoutGlobalScope(\App\Scopes\TenantScope::class);
+            }
+
+            // HR/Employee: TenantScope applies automatically based on their company_id
+            return $q;
+        };
+
+        // 1. Total Active Employees
+        $totalEmployees = $query(\App\Models\Employee::class)
+            ->where('status', 'active')
+            ->count();
+
+        // 2. Leaves Today (Global for Admin, Scoped for HR)
+        $leavesToday = $query(\App\Models\TimeOff::class)
+            ->where('status', 'Approved')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->with('timeOffType')
+            ->get();
+
+        // 3. Categorize Leaves
+        $unplannedCount = $leavesToday->filter(function ($leave) {
+            $typeName = strtolower($leave->timeOffType->name ?? '');
+            return str_contains($typeName, 'sick') || str_contains($typeName, 'emergency');
+        })->count();
+
+        $plannedCount = $leavesToday->count() - $unplannedCount;
+
+        // 4. Calculate Presents
+        $presentCount = max(0, $totalEmployees - $leavesToday->count());
+
+        // 5. Pending Requests
+        $pendingCount = $query(\App\Models\TimeOff::class)
+            ->where('status', 'Pending')
+            ->count();
+
+        // 6. Stats Array (For the Widgets)
         $stats = [
-            'pending' => TimeOff::where('company_id', $companyId)->where('status', 'Pending')->count(),
-            'total' => TimeOff::where('company_id', $companyId)->count(),
-            'approved' => TimeOff::where('company_id', $companyId)->where('status', 'Approved')->count(),
-            'rejected' => TimeOff::where('company_id', $companyId)->where('status', 'Rejected')->count(),
+            'total_employees' => $totalEmployees,
+            'present_today'   => $presentCount,
+            'planned_today'   => $plannedCount,
+            'unplanned_today' => $unplannedCount,
+            'pending_total'   => $pendingCount,
         ];
 
-        return $dataTable->render('admin.time-offs.index', compact('stats'));
+        // 7. Status Array (For the Pagination Summary Widget)
+        // We use the same helper to ensure Admin sees global counts
+        $status = [
+            'pending'  => $query(\App\Models\TimeOff::class)->where('status', 'Pending')->count(),
+            'total'    => $query(\App\Models\TimeOff::class)->count(),
+            'approved' => $query(\App\Models\TimeOff::class)->where('status', 'Approved')->count(),
+            'rejected' => $query(\App\Models\TimeOff::class)->where('status', 'Rejected')->count(),
+        ];
+
+        return $dataTable->render('admin.time-offs.index', compact('stats', 'status'));
     }
+
 
     /**
      * Show the form for creating a new time-off request.

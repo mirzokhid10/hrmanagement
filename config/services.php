@@ -21,7 +21,9 @@ return [
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
-
+    'yandex' => [
+        'map_key' => env('YANDEX_MAP_API_KEY'),
+    ],
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
@@ -33,6 +35,11 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+    'hh' => [
+        'client_id'     => env('HH_CLIENT_ID'),
+        'client_secret' => env('HH_CLIENT_SECRET'),
+        'redirect'      => env('HH_REDIRECT_URI'),
     ],
 
 ];

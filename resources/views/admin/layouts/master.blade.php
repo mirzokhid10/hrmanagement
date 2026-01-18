@@ -73,11 +73,12 @@
     <link rel="stylesheet" href="{{ asset('assets/css/styles.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/custom.css') }}">
 
+    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ config('services.yandex.map_key') }}&lang=en_US"></script>
     <!-- end::GXON Required Stylesheet -->
 
     <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.bootstrap5.min.css">
+    {{-- <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.2.2/css/dataTables.bootstrap5.min.css"> --}}
     <!-- End DataTables CSS -->
 
     <!-- begin:: Fontawesome Icons -->
@@ -189,9 +190,10 @@
     <script src="{{ asset('assets/js/todolist.js') }}"></script>
     <script src="{{ asset('assets/js/appSettings.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
+    <script src="{{ asset('assets/js/datatable.js') }}"></script>
 
     <!-- jQuery and DataTables JS -->
-    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.min.js"></script>
+    {{-- <script src="https://cdn.datatables.net/2.3.2/js/dataTables.min.js"></script> --}}
     <!-- End jQuery and DataTables JS -->
 
 

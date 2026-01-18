@@ -16,6 +16,8 @@ class Employee extends Model
     protected $fillable = [
         'company_id',
         'user_id',
+        'telegram_chat_id',
+        'telegram_username',
         'first_name',
         'last_name',
         'image',
@@ -28,6 +30,7 @@ class Employee extends Model
         'department_id',
         'salary',
         'status',
+        'last_interaction_at',
         'reports_to',
     ];
 

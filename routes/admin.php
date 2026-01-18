@@ -1,12 +1,18 @@
 <?php
 
 use App\Http\Controllers\Backend\AdminDashboardController;
+use App\Http\Controllers\Backend\AttendanceController;
+use App\Http\Controllers\Backend\BotSettingsController;
 use App\Http\Controllers\Backend\DepartmentController;
+use App\Http\Controllers\Backend\DocumentController;
 use App\Http\Controllers\Backend\EmployeeController;
+use App\Http\Controllers\Backend\HHIntegrationController;
+use App\Http\Controllers\Backend\OfficeLocationController;
+use App\Http\Controllers\Backend\OfficeWifiController;
+use App\Http\Controllers\Backend\RecruitmentController;
 use App\Http\Controllers\Backend\TimeOffController;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-
+use Telegram\Bot\Laravel\Facades\Telegram;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,9 +56,69 @@ Route::patch('time-offs/{timeOff}/status', [TimeOffController::class, 'updateSta
 
 Route::get('/ajax/get-departments/{companyId}', [TimeOffController::class, 'getDepartments'])->name('ajax.get-departments');
 Route::get('/ajax/get-employees', [TimeOffController::class, 'getEmployees'])->name('ajax.get-employees');
+
 //////////////////////////////////////////////////
 // Department Management Routes
 ///////////////////////////////////////////////////
 
 Route::resource('department', DepartmentController::class)
     ->names('department');
+
+//////////////////////////////////////////////////
+// Bot Settings Routes
+///////////////////////////////////////////////////
+
+Route::get('/bot-settings', [BotSettingsController::class, 'index'])
+    ->name('bot-settings.index');
+Route::put('/bot-settings', [BotSettingsController::class, 'update'])
+    ->name('bot-settings.update');
+
+//////////////////////////////////////////////////
+// Office Location Routes
+///////////////////////////////////////////////////
+
+Route::resource('office-location', OfficeLocationController::class);
+
+//////////////////////////////////////////////////
+//  Office WiFi Networks
+///////////////////////////////////////////////////
+
+Route::resource('office-wifi', OfficeWifiController::class);
+
+//////////////////////////////////////////////////
+//  Attendance Management Routes
+///////////////////////////////////////////////////
+
+Route::get('/attendance', [AttendanceController::class, 'index'])
+    ->name('attendance.index');
+Route::get('/attendance/{attendance}', [AttendanceController::class, 'show'])
+    ->name('attendance.show');
+
+//////////////////////////////////////////////////
+//  Documents Management Routes
+///////////////////////////////////////////////////
+
+
+Route::get('policies', [DocumentController::class, 'policies'])->name('document.policies');
+
+Route::get('employee/{employee}/document', [DocumentController::class, 'index'])->name('document.index');
+
+Route::post('document', [DocumentController::class, 'store'])->name('document.store');
+
+Route::get('document/{document}/download', [DocumentController::class, 'download'])->name('document.download');
+Route::delete('document/{document}', [DocumentController::class, 'destroy'])->name('document.destroy');
+
+//////////////////////////////////////////////////
+//  Recruitment Management Routes
+///////////////////////////////////////////////////
+
+Route::resource('recruitment', RecruitmentController::class);
+Route::get('/companies/{company_id}/departments', [RecruitmentController::class, 'getDepartments'])
+    ->name('recruitment.get_departments');
+
+//////////////////////////////////////////////////
+//  HH Integration Management Routes
+///////////////////////////////////////////////////
+
+Route::get('hh/connect', [HHIntegrationController::class, 'connect'])->name('hh.connect');
+Route::get('hh/callback', [HHIntegrationController::class, 'callback'])->name('hh.callback');

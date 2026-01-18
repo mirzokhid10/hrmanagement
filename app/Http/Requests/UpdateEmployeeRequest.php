@@ -19,6 +19,7 @@ class UpdateEmployeeRequest extends FormRequest
     }
 
     public function rules(): array
+
     {
         $employee = $this->route('employee'); // Get the employee being updated
 

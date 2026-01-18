@@ -2,7 +2,8 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    App\Providers\EmployeeServiceProvider::class,
+    App\Providers\AuthServiceProvider::class,
     App\Providers\RouteServiceProvider::class,
+    App\Providers\TelescopeServiceProvider::class,
     Yajra\DataTables\DataTablesServiceProvider::class,
 ];

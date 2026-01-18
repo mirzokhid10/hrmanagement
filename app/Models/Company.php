@@ -24,6 +24,11 @@ class Company extends Model
         'subdomain',
         'user_id',
         'is_active',
+
+        'hh_access_token',
+        'hh_refresh_token',
+        'hh_employer_id',
+        'hh_token_expires_at',
     ];
 
     protected $casts = [

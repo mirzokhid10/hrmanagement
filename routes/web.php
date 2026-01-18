@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\Backend\AdminDashboardController;
+
 use App\Http\Controllers\ProfileController;
-use App\Http\Middleware\TenantMiddleware;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\TelegramWebhookController;
+use App\Http\Controllers\WiFiVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,6 +21,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+//////////////////////////////////////////////////
+// Telegram WiFi Verification (public routes)
+//////////////////////////////////////////////////
+
+Route::get('/telegram/verify-wifi/{attendance}', [WiFiVerificationController::class, 'show'])
+    ->name('telegram.verify-wifi');
+Route::post('/telegram/verify-wifi/{attendance}', [WiFiVerificationController::class, 'verify'])
+    ->name('telegram.verify-wifi.process');
 
 
+// Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
+Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
 require __DIR__ . '/auth.php';
