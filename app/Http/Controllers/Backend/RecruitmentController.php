@@ -13,9 +13,11 @@ use App\Services\Interfaces\RecruitmentServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\HHruService;
+use Illuminate\Support\Facades\Storage;
 
 class RecruitmentController extends Controller
 {
+
     protected RecruitmentServiceInterface $recruitmentService;
 
     public function __construct(RecruitmentServiceInterface $recruitmentService)
@@ -27,13 +29,16 @@ class RecruitmentController extends Controller
      */
     public function index(Request $request)
     {
+
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $companyIdForQuery = $user->isAdmin() ? null : $user->company_id;
 
         $stats = $this->recruitmentService->getStats($companyIdForQuery);
-        $recruitments = $this->recruitmentService->getPaginatedRecruitments($companyIdForQuery, 8);
-        $candidates = $this->recruitmentService->getRecentCandidates($companyIdForQuery);
+
+        $recruitments = $this->recruitmentService->getLatestPublishedRecruitments($companyIdForQuery, 4);
+
+        $candidates = $this->recruitmentService->getRecentCandidates($companyIdForQuery, 10);
 
         // ✅ FETCH DEPARTMENTS
         // If Admin: Fetch all (or empty if you want them to select company first)
@@ -44,8 +49,21 @@ class RecruitmentController extends Controller
 
         $companies = $user->isAdmin() ? Company::all() : collect();
 
+        $upcomingInterviews = $this->recruitmentService->getUpcomingInterviews($companyIdForQuery, 5);
 
-        return view('admin.recruitment.index', compact('stats', 'recruitments', 'candidates', 'companies', 'departments'));
+        return view('admin.recruitment.index', compact('stats', 'recruitments', 'candidates', 'companies', 'departments', 'upcomingInterviews'));
+    }
+
+    public function list(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $companyIdForQuery = $user->isAdmin() ? null : $user->company_id;
+
+        // Get 15 per page for the table
+        $recruitments = $this->recruitmentService->getPaginatedRecruitments($companyIdForQuery, 15);
+
+        return view('admin.recruitment.list', compact('recruitments'));
     }
 
     /**
@@ -109,7 +127,7 @@ class RecruitmentController extends Controller
     /**
      * Show the form for editing the specified Job Vacancy.
      */
-    public function edit(Recruitment $recruitment)
+    public function edit(Recruitment $recruitment, HHruService $hhService)
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -125,7 +143,9 @@ class RecruitmentController extends Controller
         // Ensure we only show departments for the recruitment's company
         $departments = Department::where('company_id', $recruitment->company_id)->get();
 
-        return view('admin.recruitment.edit', compact('recruitment', 'companies', 'departments'));
+        $hhRoles = $hhService->getProfessionalRoles();
+
+        return view('admin.recruitment.edit', compact('recruitment', 'companies', 'departments', 'hhRoles'));
     }
 
     /**
@@ -153,6 +173,29 @@ class RecruitmentController extends Controller
             notify()->error('Failed to update job vacancy.');
             return redirect()->back()->withInput();
         }
+    }
+
+    public function updateStatus(Request $request, Recruitment $recruitment)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (!$user->isAdmin() && $recruitment->company_id !== $user->company_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:published,draft,closed'
+        ]);
+
+        $recruitment->update(['status' => $request->status]);
+
+        // ✅ Return JSON for AJAX
+        return response()->json([
+            'message' => 'Status updated successfully',
+            'status'  => $request->status,
+            'label'   => ucfirst($request->status)
+        ]);
     }
 
     /**
@@ -185,5 +228,77 @@ class RecruitmentController extends Controller
             ->get();
 
         return response()->json($departments);
+    }
+
+    /**
+     * Update the status of a specific candidate.
+     */
+    public function updateCandidateStatus(Request $request, Candidate $candidate)
+    {
+        /** @var \App\Models\User $user */
+        // 🔒 SECURITY CHECK: Multi-Tenancy
+        // Ensure the HR manager can only update candidates FOR THEIR OWN COMPANY.
+        // Admins can update anyone.
+        $user = Auth::user();
+        if (!$user->isAdmin() && $candidate->company_id !== Auth::user()->company_id) {
+            notify()->error('Unauthorized action.');
+        }
+
+        // Validate Status
+        $request->validate([
+            'status' => 'required|in:pending,shortlisted,interviewed,hired,rejected'
+        ]);
+
+        $candidate->update(['status' => $request->status]);
+
+        // Optional: Trigger Notification (Email/Telegram) here
+        // $this->recruitmentService->notifyCandidateStatusChange($candidate);
+
+        return back()->with('success', "Candidate status updated to " . ucfirst($request->status));
+    }
+
+    /**
+     * Download the candidate's resume.
+     */
+    public function downloadCandidateResume(Candidate $candidate)
+    {
+        /** @var \App\Models\User $user */
+        // 🔒 SECURITY CHECK
+        $user = Auth::user();
+        if (!$user->isAdmin() && $candidate->company_id !== Auth::user()->company_id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!$candidate->resume_path || !Storage::exists($candidate->resume_path)) {
+            return back()->with('error', 'Resume file not found.');
+        }
+
+        // Force download with a nice filename (e.g., "Resume_Jamshid_Sobirov.pdf")
+        $extension = pathinfo($candidate->resume_path, PATHINFO_EXTENSION);
+        $filename = "Resume_{$candidate->first_name}_{$candidate->last_name}.{$extension}";
+
+        return Storage::download($candidate->resume_path, $filename);
+    }
+
+    public function updateInterviewSchedule(Request $request, Candidate $candidate)
+    {
+        /** @var \App\Models\User $user */
+        // Security Check
+        $user = Auth::user();
+        if (!$user->isAdmin() && $candidate->company_id !== Auth::user()->company_id) {
+            abort(403);
+        }
+
+        $request->validate([
+            'interview_scheduled_at' => 'nullable|date',
+        ]);
+
+        $candidate->update([
+            'interview_scheduled_at' => $request->interview_scheduled_at,
+            // Optional: Auto-change status to 'interviewed' if a date is set
+            'status' => $request->interview_scheduled_at ? 'interviewed' : $candidate->status
+        ]);
+
+        return back()->with('success', 'Interview schedule updated successfully.');
     }
 }

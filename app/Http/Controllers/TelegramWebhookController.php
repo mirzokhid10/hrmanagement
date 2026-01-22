@@ -2,124 +2,286 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\OfficeLocation;
+use App\Services\TelegramCandidateService;
+use App\Services\TelegramAdminService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Log; // <--- IMPORTANT
+use Illuminate\Support\Str;
 use Telegram\Bot\Laravel\Facades\Telegram;
 use Telegram\Bot\Keyboard\Keyboard;
 
 class TelegramWebhookController extends Controller
 {
-    public function handle(Request $request)
-    {
-        $update = Telegram::getWebhookUpdate();
+    public function handle(
+        Request $request,
+        TelegramCandidateService $candidateService,
+        TelegramAdminService $adminService
+    ) {
+        // 🔍 DEBUG: Log that we received a request
+        Log::info('Telegram Webhook Received', $request->all());
 
-        if (!$update->has('message')) {
-            return response('OK');
-        }
+        try {
+            $update = Telegram::getWebhookUpdate();
 
-        $message = $update->getMessage();
-        $chatId = $message->getChat()->getId();
-        $username = $message->getChat()->getUsername();
-        $text = $message->getText();
+            // 1. Safety Check
+            if (!$update->has('message') && !$update->has('callback_query')) {
+                return response('OK');
+            }
 
-        // 1. Handle /start
-        if ($text === '/start') {
-            $this->handleStartCommand($chatId);
-            return response('OK');
-        }
+            // 2. Identify User
+            if ($update->has('callback_query')) {
+                $chatId = $update->getCallbackQuery()->getMessage()->getChat()->getId();
+            } else {
+                $chatId = $update->getMessage()->getChat()->getId();
+            }
 
-        // 2. Handle Contact Sharing (Registration)
-        if ($message->has('contact')) {
-            $this->handleContactSharing($chatId, $message->getContact());
-            return response('OK');
-        }
+            // 3. Atomic Block
+            $lock = Cache::lock("bot_processing_{$chatId}", 5);
+            if (!$lock->get()) return response('OK');
 
-        // 3. Handle Menu Buttons (Check In / Check Out)
-        if ($text === '📍 Check In') {
-            $this->askForLocation($chatId, 'check_in');
-            return response('OK');
-        }
+            try {
+                // Find Logged in Employee
+                $employee = Employee::withoutGlobalScopes()
+                    ->where('telegram_chat_id', $chatId)
+                    ->first();
 
-        if ($text === '👋 Check Out') {
-            $this->askForLocation($chatId, 'check_out');
-            return response('OK');
-        }
 
-        // 4. Handle Location Data (The Verification)
-        if ($message->has('location')) {
-            $this->handleLocationReceived($chatId, $message->getLocation());
-            return response('OK');
+                // Check Admin Status
+                if ($employee) {
+                    // 1. Manually fetch Department Name (Ignoring Tenant Scope)
+                    $deptName = null;
+                    if ($employee->department_id) {
+                        $deptName = \App\Models\Department::withoutGlobalScopes()
+                            ->where('id', $employee->department_id)
+                            ->value('name'); // Directly get the name string
+                    }
+
+                    // 2. Check User Admin Status
+                    $userIsAdmin = false;
+                    if ($employee->user_id) {
+                        // Load User manually to be safe
+                        $user = \App\Models\User::find($employee->user_id);
+                        $userIsAdmin = $user ? $user->isAdmin() : false;
+                    }
+
+                    // 4. Final Decision
+                    $isAdmin = in_array($deptName, ['HR', 'Human Resources']) || $userIsAdmin;
+                }
+
+                // ====================================================
+                // 🖱 CALLBACKS
+                // ====================================================
+                if ($update->has('callback_query')) {
+                    $callback = $update->getCallbackQuery();
+                    $data = $callback->getData();
+                    Telegram::answerCallbackQuery(['callback_query_id' => $callback->getId()]);
+
+                    // Admin Callbacks
+                    if (Str::startsWith($data, 'admin_')) {
+                        if (!$isAdmin) return response('OK'); // Silent fail for non-admins
+
+                        if ($data === 'admin_cancel_wizard') {
+                            Cache::forget("admin_job_wizard_{$chatId}");
+                            Telegram::sendMessage(['chat_id' => $chatId, 'text' => '❌ Job posting cancelled.']);
+                        } elseif (Str::startsWith($data, 'admin_cand_page_')) {
+                            $page = (int) Str::after($data, 'admin_cand_page_');
+                            $adminService->listPendingCandidates($chatId, $employee, $page);
+                        } elseif (Str::startsWith($data, 'admin_cand_')) {
+                            $parts = explode('_', $data);
+                            if (count($parts) >= 4) {
+                                $action = $parts[2];
+                                $id = $parts[3];
+                                $res = $adminService->handleCandidateAction($chatId, $action, $id);
+                                if ($res) Telegram::sendMessage(['chat_id' => $chatId, 'text' => $res, 'parse_mode' => 'Markdown']);
+                                if ($action !== 'resume') $adminService->listPendingCandidates($chatId, $employee);
+                            }
+                        }
+                    } elseif (Str::startsWith($data, 'emp_dept_')) {
+                        $adminService->handleAddEmployeeCallback($chatId, $data);
+                    }
+
+                    // Candidate Callbacks
+                    if (Str::startsWith($data, 'lang_')) $candidateService->handleLanguageSelection($chatId, Str::after($data, 'lang_'));
+                    if (Str::startsWith($data, 'select_company_')) $candidateService->listJobsForCompany($chatId, Str::after($data, 'select_company_'), Cache::get("user_lang_{$chatId}", 'en'));
+                    if (Str::startsWith($data, 'select_job_')) $candidateService->showJobPreview($chatId, Str::after($data, 'select_job_'), Cache::get("user_lang_{$chatId}", 'en'));
+                    if (Str::startsWith($data, 'start_form_')) {
+                        $msg = $candidateService->startApplicationForm($chatId, Str::after($data, 'start_form_'));
+                        Telegram::sendMessage(['chat_id' => $chatId, 'text' => $msg, 'parse_mode' => 'Markdown']);
+                    }
+                    if ($data === 'skip_cover') $candidateService->handleConversation(['text' => 'skip_cover', 'is_callback' => true], $chatId);
+                }
+
+                // ====================================================
+                // 📩 TEXT MESSAGES
+                // ====================================================
+                elseif ($update->has('message')) {
+                    $messageObj = $update->getMessage();
+                    $text = $messageObj->getText() ?? '';
+
+                    $messageArray = [
+                        'text' => $text,
+                        'contact' => $messageObj->has('contact') ? $messageObj->getContact()->toArray() : null,
+                        'document' => $messageObj->has('document') ? $messageObj->getDocument()->toArray() : null,
+                    ];
+
+                    // 1. ADMIN COMMANDS (Priority 1)
+                    if ($isAdmin) {
+
+                        if ($text === '/stats') {
+                            $adminService->showStats($chatId, $employee);
+                            return response('OK');
+                        }
+                        if ($text === '/addemployee') {
+                            $adminService->startAddEmployeeWizard($chatId, $employee);
+                            return response('OK');
+                        }
+                        if ($text === '/reviews') {
+                            $adminService->showPendingReviews($chatId, $employee);
+                            return response('OK');
+                        }
+                        if (Cache::has("admin_add_emp_{$chatId}")) {
+                            $adminService->handleAddEmployeeWizard($chatId, $text);
+                            return response('OK');
+                        }
+
+                        if (Cache::has("admin_job_wizard_{$chatId}")) {
+                            $adminService->handleJobWizard($chatId, $text);
+                            return response('OK');
+                        }
+                        if ($text === '/postjob') {
+                            $adminService->startJobWizard($chatId, $employee);
+                            return response('OK');
+                        }
+                        if ($text === '/candidates') {
+                            $adminService->listPendingCandidates($chatId, $employee);
+                            return response('OK');
+                        }
+                        if (Str::startsWith($text, '/employee ')) {
+                            $query = Str::after($text, '/employee ');
+                            $adminService->lookupEmployee($chatId, $employee, $query);
+                            return response('OK');
+                        }
+                        if (Str::startsWith($text, '/whosout')) {
+                            $date = Str::after($text, '/whosout ');
+                            $date = trim($date) === '' || $date === '/whosout' ? null : $date;
+                            $adminService->checkWhosOut($chatId, $employee, $date);
+                            return response('OK');
+                        }
+                    }
+
+                    // 2. CANDIDATE & REGULAR LOGIC
+                    if (Str::startsWith($text, '/start ') && strlen($text) > 7) {
+                        $candidateService->handleStartCommand($chatId, $text);
+                    } elseif (Cache::has("candidate_session_{$chatId}")) {
+                        $candidateService->handleConversation($messageArray, $chatId);
+                    } elseif ($employee) {
+                        $this->handleEmployeeLogic($employee, $text, $messageObj, $chatId);
+                    } elseif ($messageObj->has('contact')) {
+                        // Registration Logic
+                        $contact = $messageObj->getContact();
+                        if ($contact->getUserId() !== $chatId) {
+                            Telegram::sendMessage(['chat_id' => $chatId, 'text' => "🚫 Send your own contact."]);
+                        } else {
+                            $phone = preg_replace('/[^0-9]/', '', $contact->getPhoneNumber());
+                            $emp = Employee::withoutGlobalScopes()
+                                ->whereRaw("REPLACE(phone_number, '+', '') LIKE '%" . substr($phone, -9) . "'")
+                                ->first();
+
+                            if ($emp) {
+                                $emp->update([
+                                    'telegram_chat_id' => $chatId,
+                                    'telegram_username' => $messageObj->getChat()->getUsername()
+                                ]);
+                                Telegram::sendMessage(['chat_id' => $chatId, 'text' => "🎉 Connected as {$emp->first_name}!"]);
+                                $this->sendMainMenu($chatId, "Menu:");
+                            } else {
+                                Telegram::sendMessage(['chat_id' => $chatId, 'text' => "🚫 Number not found in database."]);
+                            }
+                        }
+                    } else {
+                        // Fallback
+                        $this->sendStartWithRegister($chatId);
+                    }
+                }
+            } finally {
+                $lock->release();
+            }
+        } catch (\Throwable $e) { // Catch Throwable to catch ALL errors including syntax
+            // 📝 LOG ERROR TO SERVER
+            Log::error('Telegram Fatal Error: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            // 🚨 SEND ERROR TO YOU (DEVELOPER)
+            try {
+                $debugChatId = '632710453'; // Your ID
+                $errorMsg = "⚠️ **Backend Error**\n\n" .
+                    "📄 " . basename($e->getFile()) . ":" . $e->getLine() . "\n" .
+                    "❌ " . $e->getMessage();
+
+                Telegram::sendMessage([
+                    'chat_id' => $debugChatId,
+                    'text' => substr($errorMsg, 0, 4000),
+                    'parse_mode' => 'Markdown'
+                ]);
+            } catch (\Exception $ex) {
+                Log::error('Could not send Telegram error report.');
+            }
         }
 
         return response('OK');
     }
 
-    // -------------------------------------------------------------------------
-    // 🟢 PHASE 1: REGISTRATION
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 🟢 HELPER METHODS (Must be inside class)
+    // =========================================================================
 
-    protected function handleStartCommand($chatId)
+    protected function sendStartWithRegister($chatId)
     {
-        $employee = Employee::withoutGlobalScope(\App\Scopes\TenantScope::class)
-            ->where('telegram_chat_id', $chatId)
-            ->first();
-
-        if ($employee) {
-            $this->sendMainMenu($chatId, "Welcome back, {$employee->first_name}! Ready for work?");
-        } else {
-            // Button to share contact
-            $keyboard = Keyboard::make()
-                ->setResizeKeyboard(true)
-                ->setOneTimeKeyboard(true)
-                ->row([
-                    Keyboard::button([
-                        'text' => '📱 Share My Phone Number',
-                        'request_contact' => true
-                    ])
-                ]);
-
-            Telegram::sendMessage([
-                'chat_id' => $chatId,
-                'text' => "Assalomu Alaykum! \n\nPlease click the button below to verify your identity.",
-                'reply_markup' => $keyboard
+        $keyboard = Keyboard::make()
+            ->setResizeKeyboard(true)
+            ->setOneTimeKeyboard(true)
+            ->row([
+                Keyboard::button([
+                    'text' => '📱 Telefon raqamni yuborish (Login)',
+                    'request_contact' => true
+                ])
             ]);
-        }
+
+        Telegram::sendMessage([
+            'chat_id' => $chatId,
+            'text' => "Assalomu Alaykum! \n\nAgar siz xodim bo'lsangiz, **Login** tugmasini bosing.\nAgar ish qidirayotgan bo'lsangiz /start buyrug'ini yuboring.",
+            'reply_markup' => $keyboard
+        ]);
     }
 
-    protected function handleContactSharing($chatId, $contact)
+    protected function handleEmployeeLogic($employee, $text, $messageObj, $chatId)
     {
-        // Normalize phone: remove + and spaces
-        $normalizedPhone = preg_replace('/[^0-9]/', '', $contact->getPhoneNumber());
-
-        $employee = Employee::withoutGlobalScope(\App\Scopes\TenantScope::class)
-            ->whereRaw("REGEXP_REPLACE(phone_number, '[^0-9]', '') = ?", [$normalizedPhone])
-            ->first();
-
-        if ($employee) {
-            $employee->update(['telegram_chat_id' => $chatId]);
-            $employee->update(['telegram_username' => $chatId]);
-            $this->sendMainMenu($chatId, "✅ Verified! Welcome, {$employee->first_name}.");
-        } else {
-            Telegram::sendMessage([
-                'chat_id' => $chatId,
-                'text' => "❌ Phone number not found. Please contact HR.",
-                'reply_markup' => Keyboard::remove()
-            ]);
+        if ($text === '📍 Check In') {
+            $this->askForLocation($chatId, 'check_in');
+            return;
         }
+        if ($text === '👋 Check Out') {
+            $this->askForLocation($chatId, 'check_out');
+            return;
+        }
+        if ($messageObj->has('location')) {
+            $this->handleLocationReceived($chatId, $messageObj->getLocation());
+            return;
+        }
+        $this->sendMainMenu($chatId, "Welcome back, {$employee->first_name}.");
     }
 
     protected function sendMainMenu($chatId, $message)
     {
-        // The Permanent Menu Buttons
         $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
-            ->setPersistent(true) // Always visible
+            ->setPersistent(true)
             ->row([
                 Keyboard::button(['text' => '📍 Check In']),
+                Keyboard::button(['text' => '👋 Check Out']),
             ]);
 
         Telegram::sendMessage([
@@ -129,23 +291,16 @@ class TelegramWebhookController extends Controller
         ]);
     }
 
-    // -------------------------------------------------------------------------
-    // 📍 PHASE 2: ATTENDANCE LOGIC
-    // -------------------------------------------------------------------------
-
     protected function askForLocation($chatId, $action)
     {
-        // Save the intended action (check_in or check_out) in Cache for 5 minutes
         Cache::put("attendance_action_{$chatId}", $action, 300);
-
-        // Ask user to send location button
         $keyboard = Keyboard::make()
             ->setResizeKeyboard(true)
             ->setOneTimeKeyboard(true)
             ->row([
                 Keyboard::button([
                     'text' => '📍 Send Current Location',
-                    'request_location' => true // This triggers the location popup
+                    'request_location' => true
                 ])
             ])
             ->row([
@@ -161,25 +316,17 @@ class TelegramWebhookController extends Controller
 
     protected function handleLocationReceived($chatId, $location)
     {
-        // 1. Retrieve the action (Check In or Out)
         $action = Cache::get("attendance_action_{$chatId}");
-
         if (!$action) {
             $this->sendMainMenu($chatId, "⚠️ Session expired. Please click Check In/Out again.");
             return;
         }
 
-        // 2. Find the Employee
-        $employee = Employee::withoutGlobalScope(\App\Scopes\TenantScope::class)
-            ->where('telegram_chat_id', $chatId)
-            ->first();
-
+        $employee = Employee::where('telegram_chat_id', $chatId)->first();
         if (!$employee) return;
 
-        // 3. Find the nearest Office Location for THIS company
-        // We look for any active office in the employee's company
-        $offices = OfficeLocation::withoutGlobalScope(\App\Scopes\TenantScope::class)
-            ->where('company_id', $employee->company_id)
+        // Find nearest office
+        $offices = OfficeLocation::where('company_id', $employee->company_id)
             ->where('is_active', true)
             ->get();
 
@@ -189,54 +336,33 @@ class TelegramWebhookController extends Controller
 
         foreach ($offices as $office) {
             $distance = $this->calculateDistance($userLat, $userLon, $office->latitude, $office->longitude);
-
             if ($distance <= $office->radius_meters) {
                 $allowedOffice = $office;
                 break;
             }
         }
 
-        // 4. Validate Distance
         if (!$allowedOffice) {
-            $this->sendMainMenu($chatId, "❌ **Access Denied**\n\nYou are not within the office range.\nDistance checked against " . $offices->count() . " locations.");
+            $this->sendMainMenu($chatId, "❌ **Access Denied**\n\nYou are not within the office range.");
             return;
         }
-
-        // 5. Save Attendance
-        // Note: In a real app, you'd check if they already checked in today.
-        // For Day 5 MVP, we just log it.
-
-        // You might want to create a full Attendance model record here.
-        // For now, let's log to the attendance_logs table you showed me.
-
-        // If it's a Check In, we create a new Attendance record
-        // If Check Out, we update the last one.
-        // (Simplified for this snippet - assuming we just want to log success for now)
 
         Telegram::sendMessage([
             'chat_id' => $chatId,
             'text' => "✅ **Success!**\n\nAction: " . strtoupper(str_replace('_', ' ', $action)) . "\nOffice: {$allowedOffice->name}\nTime: " . now()->format('H:i'),
         ]);
 
-        // Clear cache and show menu
         Cache::forget("attendance_action_{$chatId}");
-        $this->sendMainMenu($chatId, "What would you like to do next?");
+        $this->sendMainMenu($chatId, "Attendance recorded.");
     }
 
-    // Helper: Haversine Formula to calculate distance in meters
     private function calculateDistance($lat1, $lon1, $lat2, $lon2)
     {
-        $earthRadius = 6371000; // Meters
-
+        $earthRadius = 6371000;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-            sin($dLon / 2) * sin($dLon / 2);
-
+        $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
         return $earthRadius * $c;
     }
 }

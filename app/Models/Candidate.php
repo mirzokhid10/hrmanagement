@@ -25,6 +25,8 @@ class Candidate extends Model
         'interview_scheduled_at',
         'hh_candidate_id',
         'hh_resume_id',
+        'telegram_chat_id',
+        'source'
     ];
 
     protected $casts = [

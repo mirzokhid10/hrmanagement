@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
+use App\Mail\WelcomeEmail;
 use App\Models\Company;
 use App\Models\Department; // Import Department model
 use App\Models\Employee;
@@ -13,7 +14,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Telegram\Bot\Laravel\Facades\Telegram;
 
 class EmployeeController extends Controller
 {
@@ -192,5 +195,59 @@ class EmployeeController extends Controller
             ->get();
 
         return response()->json($departments);
+    }
+
+    public function sendWelcomeEmail(Request $request, Employee $employee)
+    {
+        // Basic validation
+        $request->validate([
+            'language' => 'required|in:uz,ru,en'
+        ]);
+
+        if (!$employee->email) {
+            return back()->with('error', 'This employee does not have an email address.');
+        }
+
+        // Send the email
+        try {
+            Mail::to($employee->email)->send(new WelcomeEmail($employee, $request->language));
+            notify()->success('Welcome email sent successfully!');
+        } catch (\Exception $e) {
+            notify()->error('Failed to send email. Check your mail configuration.');
+        }
+
+        return back();
+    }
+
+    public function sendTelegramWelcome(Employee $employee)
+    {
+        // 1. Check if employee is connected
+        if (!$employee->telegram_chat_id) {
+            notify()->error("⚠️ Cannot send message! This employee has not connected to the Telegram Bot yet.");
+            return back();
+        }
+
+        // 2. Prepare the Message
+        $message = "🎉 **Xush kelibsiz, {$employee->first_name}!**\n\n" .
+            "Sizni **{$employee->company->name}** jamoasida ko'rib turganimizdan xursandmiz.\n\n" .
+            "📋 **Sizning ma'lumotlaringiz:**\n" .
+            "👤 Lavozim: {$employee->job_title}\n" .
+            "📞 Telefon: {$employee->phone_number}\n\n" .
+            "Agar savollaringiz bo'lsa, HR bo'limiga murojaat qiling.";
+
+        try {
+            // 3. Send via Telegram API
+            Telegram::sendMessage([
+                'chat_id' => $employee->telegram_chat_id,
+                'text' => $message,
+                'parse_mode' => 'Markdown'
+            ]);
+
+            notify()->success('Telegram welcome message sent successfully!');
+        } catch (\Exception $e) {
+            notify()->error('Failed to send Telegram message: ' . $e->getMessage());
+        }
+
+        return back();
     }
 }

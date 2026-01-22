@@ -65,6 +65,17 @@ hr {
     color: #2196f3;
 }
 
+.btn-dark {
+    color: #316aff !important;
+    background-color: #fff;
+    border: 1px solid #316aff !important;
+}
+
+.btn-dark:hover {
+    color: #fff !important;
+    background-color: #316aff;
+}
+
 .btn.btn-subtle-success {
     background-color: #e9f7f2 !important;
     border-color: #e9f7f2 !important;
@@ -140,5 +151,17 @@ hr {
 }
 
 .fs-14 {
-    font-size: 14px !important;
+    font-size: 14px;
+}
+
+.fs-16 {
+    font-size: 16px;
+}
+
+.fs-20 {
+    font-size: 20px;
+}
+
+.fs-24 {
+    font-size: 24px;
 }

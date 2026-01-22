@@ -1,14 +1,19 @@
 <?php
 
 use App\Http\Controllers\Backend\AdminDashboardController;
+use App\Http\Controllers\Backend\AnnouncementController;
 use App\Http\Controllers\Backend\AttendanceController;
 use App\Http\Controllers\Backend\BotSettingsController;
 use App\Http\Controllers\Backend\DepartmentController;
 use App\Http\Controllers\Backend\DocumentController;
 use App\Http\Controllers\Backend\EmployeeController;
 use App\Http\Controllers\Backend\HHIntegrationController;
+use App\Http\Controllers\Backend\MeetingController;
 use App\Http\Controllers\Backend\OfficeLocationController;
 use App\Http\Controllers\Backend\OfficeWifiController;
+
+use App\Http\Controllers\Backend\OnboardingController;
+use App\Http\Controllers\Backend\OrgChartController;
 use App\Http\Controllers\Backend\RecruitmentController;
 use App\Http\Controllers\Backend\TimeOffController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +43,10 @@ Route::get('/dashboard', [AdminDashboardController::class, 'dashboard'])
 // Employee CRUD Routes
 ///////////////////////////////////////////////////
 
+Route::post('/employee/{employee}/send-welcome', [EmployeeController::class, 'sendWelcomeEmail'])
+    ->name('employee.send-welcome');
+Route::post('/employee/{employee}/telegram-welcome', [EmployeeController::class, 'sendTelegramWelcome'])
+    ->name('employee.telegram-welcome');
 Route::resource('employee', EmployeeController::class)
     ->names('employee');
 
@@ -112,9 +121,26 @@ Route::delete('document/{document}', [DocumentController::class, 'destroy'])->na
 //  Recruitment Management Routes
 ///////////////////////////////////////////////////
 
-Route::resource('recruitment', RecruitmentController::class);
+Route::get('recruitment/all', [RecruitmentController::class, 'list'])->name('recruitment.list');
 Route::get('/companies/{company_id}/departments', [RecruitmentController::class, 'getDepartments'])
     ->name('recruitment.get_departments');
+Route::put('recruitment/{recruitment}/status', [RecruitmentController::class, 'updateStatus'])
+    ->name('recruitment.status');
+Route::resource('recruitment', RecruitmentController::class);
+
+
+//////////////////////////////////////////////////
+//  Recruitment Management Routes
+///////////////////////////////////////////////////
+
+Route::patch('/candidates/{candidate}/status', [RecruitmentController::class, 'updateCandidateStatus'])
+    ->name('candidates.update-status');
+
+Route::get('/candidates/{candidate}/download', [RecruitmentController::class, 'downloadCandidateResume'])
+    ->name('candidates.download');
+
+Route::patch('/candidates/{candidate}/schedule', [RecruitmentController::class, 'updateInterviewSchedule'])
+    ->name('candidates.update-schedule');
 
 //////////////////////////////////////////////////
 //  HH Integration Management Routes
@@ -122,3 +148,41 @@ Route::get('/companies/{company_id}/departments', [RecruitmentController::class,
 
 Route::get('hh/connect', [HHIntegrationController::class, 'connect'])->name('hh.connect');
 Route::get('hh/callback', [HHIntegrationController::class, 'callback'])->name('hh.callback');
+
+//////////////////////////////////////////////////
+//  Onboarding Management (Day 11)
+//////////////////////////////////////////////////
+
+Route::get('/companies/{company}/employees-ajax', [OnboardingController::class, 'getEmployeesByCompany'])
+    ->name('companies.employees-ajax');
+
+Route::patch('/onboarding/{onboarding}/status', [OnboardingController::class, 'updateStatus'])
+    ->name('onboarding.update-status');
+
+Route::resource('onboarding', OnboardingController::class);
+
+//////////////////////////////////////////////////
+//  Announcements
+//////////////////////////////////////////////////
+
+Route::get('/departments/{department}/employees-ajax', function (\App\Models\Department $department) {
+
+    return $department->employees()
+        ->withoutGlobalScopes() // 🔥 Important: Admins might need to bypass tenant scopes
+        ->select('id', 'first_name', 'last_name')
+        ->get()
+        ->map(fn($e) => ['id' => $e->id, 'name' => $e->full_name]);
+})->name('departments.employees-ajax');
+
+Route::resource('announcements', AnnouncementController::class)->only(['index', 'store', 'destroy']);
+
+//////////////////////////////////////////////////
+//  Org Chart
+//////////////////////////////////////////////////
+
+Route::get('org-chart', [OrgChartController::class, 'index'])->name('org-chart.index');
+Route::get('org-chart/data', [OrgChartController::class, 'data'])->name('org-chart.data');
+
+//////////////////////////////////////////////////
+//  Meetings Management
+//////////////////////////////////////////////////

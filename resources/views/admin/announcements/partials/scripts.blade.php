@@ -1,79 +1,94 @@
 @push('scripts')
-<script>
-// Make variables available globally
-const isAdmin = {{ Auth::user()->isAdmin() ? 'true' : 'false' }};
+    <script>
+        // Make variables available globally
+        const isAdmin = {{ Auth::user()->isAdmin() ? 'true' : 'false' }};
 
-// 1. Load Departments (For Admin)
-window.loadCompanyData = function(companyId) {
-    if(!companyId) return;
-    fetch(`/admin/companies/${companyId}/departments`)
-        .then(res => res.json())
-        .then(data => {
-            let html = '<option value="" selected disabled>Choose Department...</option>';
-            data.forEach(d => html += `<option value="${d.id}">${d.name}</option>`);
+        // 1. Load Departments (For Admin)
+        window.loadCompanyData = function(companyId) {
+            if(!companyId) return;
 
-            // Update dropdowns in all potential places (Modal, Offcanvas, or Main page)
+            // Reset dropdowns
+            document.getElementById('department_id').innerHTML = '<option disabled>Loading...</option>';
+
+            fetch(`/admin/companies/${companyId}/departments`)
+                .then(res => res.json())
+                .then(data => {
+                    let html = '<option value="" selected disabled>Choose Department...</option>';
+                    data.forEach(d => html += `<option value="${d.id}">${d.name}</option>`);
+                    document.getElementById('department_id').innerHTML = html;
+                });
+        };
+
+        // 2. Toggle Visibility based on Dropdown Selection
+        window.toggleAudience = function() {
+            // Get value from SELECT dropdown
+            const type = document.getElementById('audience_type').value;
+
+            const deptWrapper = document.getElementById('dept_wrapper');
+            const empWrapper = document.getElementById('emp_wrapper');
             const deptSelect = document.getElementById('department_id');
-            if(deptSelect) deptSelect.innerHTML = html;
-        });
-};
+            const empSelect = document.getElementById('employee_ids');
 
-// 2. Toggle Visibility based on Audience Type
-window.toggleAudience = function() {
-    // Find which radio is checked
-    const checkedRadio = document.querySelector('input[name="audience_type"]:checked');
-    if(!checkedRadio) return; // Safety check
+            // Reset Display
+            deptWrapper.style.display = 'none';
+            empWrapper.style.display = 'none';
 
-    const type = checkedRadio.value;
-    const deptWrapper = document.getElementById('dept_wrapper');
-    const empWrapper = document.getElementById('emp_wrapper');
+            // Reset Required Attributes (to prevent validation errors on hidden fields)
+            deptSelect.required = false;
+            empSelect.required = false;
 
-    if(!deptWrapper || !empWrapper) return;
-
-    // Reset
-    deptWrapper.style.display = 'none';
-    empWrapper.style.display = 'none';
-
-    if (type === 'department') {
-        deptWrapper.style.display = 'block';
-    } else if (type === 'employees') {
-        deptWrapper.style.display = 'block';
-        empWrapper.style.display = 'block';
-        window.loadEmployeesInDept(); // Trigger load immediately if dept is already selected
-    }
-};
-
-// 3. Load Employees
-window.loadEmployeesInDept = function() {
-    const deptId = document.getElementById('department_id').value;
-
-    // Ensure we are in "Specific People" mode
-    const empRadio = document.querySelector('input[name="audience_type"][value="employees"]');
-    if (!empRadio || !empRadio.checked || !deptId) return;
-
-    const empSelect = document.getElementById('employee_ids');
-    empSelect.innerHTML = '<option disabled>Loading...</option>';
-
-    fetch(`/admin/departments/${deptId}/employees-ajax`)
-        .then(res => res.json())
-        .then(data => {
-            let html = '';
-            if(data.length === 0) {
-                html = '<option disabled>No employees found</option>';
-            } else {
-                data.forEach(e => html += `<option value="${e.id}">${e.name}</option>`);
+            if (type === 'department') {
+                deptWrapper.style.display = 'block';
+                deptSelect.required = true;
             }
-            empSelect.innerHTML = html;
-        });
-};
+            else if (type === 'employees') {
+                deptWrapper.style.display = 'block';
+                empWrapper.style.display = 'block';
 
-// 4. Initial Load (For HR)
-document.addEventListener('DOMContentLoaded', function() {
-    if (!isAdmin) {
-        // If HR, the company ID is hidden but present. Load departments automatically.
-        const hiddenCompanyId = document.getElementById('company_id');
-        if(hiddenCompanyId) window.loadCompanyData(hiddenCompanyId.value);
-    }
-});
-</script>
+                deptSelect.required = true;
+                empSelect.required = true;
+
+                // Trigger load immediately if dept is already selected
+                window.loadEmployeesInDept();
+            }
+        };
+
+        // 3. Load Employees
+        window.loadEmployeesInDept = function() {
+            const deptId = document.getElementById('department_id').value;
+            const type = document.getElementById('audience_type').value;
+
+            // Only run if we are in "Specific People" mode
+            if (type !== 'employees' || !deptId) return;
+
+            const empSelect = document.getElementById('employee_ids');
+            empSelect.innerHTML = '<option disabled>Loading...</option>';
+
+            fetch(`/admin/departments/${deptId}/employees-ajax`)
+                .then(res => res.json())
+                .then(data => {
+                    let html = '';
+                    if(data.length === 0) {
+                        html = '<option disabled>No employees found</option>';
+                    } else {
+                        data.forEach(e => html += `<option value="${e.id}">${e.name}</option>`);
+                    }
+                    empSelect.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    empSelect.innerHTML = '<option disabled>Error loading</option>';
+                });
+        };
+
+        // 4. Initial Load (For HR)
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isAdmin) {
+                // HR already has company_id in hidden field
+                // No need to load departments via AJAX as they are injected via Blade
+                // But we might need to reset the form state
+                toggleAudience();
+            }
+        });
+    </script>
 @endpush

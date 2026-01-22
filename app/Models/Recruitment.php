@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\TenantScoped;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Recruitment extends Model
@@ -37,13 +38,34 @@ class Recruitment extends Model
         'deadline' => 'date',
     ];
 
-    public function department()
+    public function company(): BelongsTo
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(Company::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 
     public function candidates()
     {
         return $this->hasMany(Candidate::class, 'recruitment_id'); // or 'vacancy_id' depending on your migration
+    }
+
+    public function getTelegramApplyLinkAttribute()
+    {
+
+
+        $botUsername = config('services.telegram.bot_username');
+
+        // Fallback if config is missing (for safety)
+        if (!$botUsername) {
+            notify()->error('No username is found');
+            return back();
+        }
+
+        // Returns: https://t.me/MyUzbekHrBot?start=apply_5
+        return "https://t.me/{$botUsername}?start=apply_{$this->id}";
     }
 }

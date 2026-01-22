@@ -33,4 +33,12 @@ Route::post('/telegram/verify-wifi/{attendance}', [WiFiVerificationController::c
 
 // Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
 Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
+
+//////////////////////////////////////////////////
+// Employee Task Controller (public routes)
+//////////////////////////////////////////////////
+
+// Route::get('/my-onboarding', [EmployeeTaskController::class, 'index'])->name('my-onboarding');
+// Route::post('/my-onboarding/{task}/complete', [EmployeeTaskController::class, 'complete'])->name('my-onboarding.complete');
+
 require __DIR__ . '/auth.php';

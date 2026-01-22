@@ -18,9 +18,29 @@
                 </ol>
             </nav>
         </div>
-        <a class="btn btn-primary waves-effect waves-light" href="{{ route('admin.employee.index') }}">
-            <i class="fa-solid fa-users me-2"></i> Back to Employee List
-        </a>
+        <div class="d-flex align-middle justify-end gap-2">
+            <form class="h-100" action="{{ route('admin.employee.telegram-welcome', $employee->id) }}" method="POST">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-info text-white"
+                    {{ !$employee->telegram_chat_id ? 'disabled' : '' }}>
+                    <i class="fi fi-rr-paper-plane me-1"></i> Send Welcome Message
+                </button>
+            </form>
+            <form action="{{ route('admin.employee.send-welcome', $employee->id) }}" method="POST" class="d-flex gap-2">
+                @csrf
+                <select name="language" class="form-select form-select-sm w-auto">
+                    <option value="uz">Uzbek</option>
+                    <option value="ru">Russian</option>
+                    <option value="en">English</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="fi fi-rr-paper-plane me-1"></i> Send Welcome Email
+                </button>
+            </form>
+            <a class="btn btn-primary waves-effect waves-light" href="{{ route('admin.employee.index') }}">
+                <i class="fa-solid fa-users me-2"></i> Back to Employee List
+            </a>
+        </div>
     </div>
 
     <div class="card p-4">

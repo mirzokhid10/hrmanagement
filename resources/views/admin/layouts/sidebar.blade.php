@@ -45,11 +45,11 @@
                         </a>
                     </li>
 
-                    {{-- <li class="menu-item">
-                        <a class="menu-link" href="{{ route('admin.document.index') }}">
-                            <span class="menu-label">Company Policies</span>
+                    <li class="menu-item">
+                        <a class="menu-link" href="{{ route('admin.onboarding.index') }}">
+                            <span class="menu-label">Onboarding Tasks</span>
                         </a>
-                    </li> --}}
+                    </li>
 
                     <li class="menu-item">
                         <a class="menu-link" href="payroll.html">
@@ -62,12 +62,12 @@
                         </a>
                     </li>
                     <li class="menu-item">
-                        <a class="menu-link" href="task-management.html">
-                            <span class="menu-label">Task Management</span>
+                        <a class="menu-link" href="{{ route('admin.announcements.index') }}">
+                            <span class="menu-label">Announcements</span>
                         </a>
                     </li>
                     <li class="menu-item">
-                        <a class="menu-link" href="analytics.html">
+                        <a class="menu-link" href="">
                             <span class="menu-label">Analytics</span>
                         </a>
                     </li>

@@ -19,10 +19,16 @@ interface RecruitmentServiceInterface
     public function getPaginatedRecruitments(?int $companyId, int $perPage = 10): LengthAwarePaginator;
 
     /**
+     * Get latest published jobs.
+     */
+    public function getLatestPublishedRecruitments(?int $companyId, int $limit = 4): Collection;
+
+    /**
      * Get recent candidates (applications) for the table.
      */
-    public function getRecentCandidates(?int $companyId, int $limit = 50): Collection;
+    public function getRecentCandidates(?int $companyId, int $limit = 10);
 
+    public function getUpcomingInterviews(?int $companyId, int $limit = 5);
     /**
      * Create a new job vacancy.
      */

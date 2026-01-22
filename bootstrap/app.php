@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'telegram/webhook', // This must match your Route URI exactly
+            'telegram/*',
         ]);
 
 

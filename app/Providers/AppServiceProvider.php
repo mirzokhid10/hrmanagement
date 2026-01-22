@@ -9,7 +9,9 @@ use Illuminate\Pagination\Paginator;
 use App\Services\Interfaces\TimeOffServiceInterface; // <-- Add this import
 use App\Services\TimeOffService;
 use App\Services\Interfaces\EmployeeServiceInterface;
+use App\Services\Interfaces\OnboardingServiceInterface;
 use App\Services\Interfaces\RecruitmentServiceInterface;
+use App\Services\OnboardingService;
 use App\Services\RecruitmentService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TimeOffServiceInterface::class, TimeOffService::class);
         $this->app->bind(DocumentServiceInterface::class, DocumentService::class);
         $this->app->bind(RecruitmentServiceInterface::class, RecruitmentService::class);
+        $this->app->bind(OnboardingServiceInterface::class, OnboardingService::class);
     }
 
     /**

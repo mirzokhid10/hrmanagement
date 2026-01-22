@@ -56,11 +56,13 @@ class RecruitmentService implements RecruitmentServiceInterface
     public function getPaginatedRecruitments(?int $companyId, int $perPage = 10): LengthAwarePaginator
     {
         /** @var \App\Models\User $user */
+
         $user = Auth::user();
 
-        $query = Recruitment::withCount(['candidates', 'candidates as new_candidates_count' => function ($q) {
-            $q->where('created_at', '>=', now()->subDays(7));
-        }]);
+        $query = Recruitment::with(['department', 'company'])
+            ->withCount(['candidates', 'candidates as new_candidates_count' => function ($q) {
+                $q->where('created_at', '>=', now()->subDays(7));
+            }]);
 
         if ($user->isAdmin()) {
             if ($companyId === null) {
@@ -73,13 +75,18 @@ class RecruitmentService implements RecruitmentServiceInterface
         return $query->latest()->paginate($perPage);
     }
 
-    public function getRecentCandidates(?int $companyId, int $limit = 50): Collection
+    public function getLatestPublishedRecruitments(?int $companyId, int $limit = 4): Collection
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $query = Candidate::with('recruitment');
+        $query = Recruitment::with(['department', 'company'])
+            ->withCount(['candidates', 'candidates as new_candidates_count' => function ($q) {
+                $q->where('created_at', '>=', now()->subDays(7));
+            }])
+            ->where('status', 'published'); // ✅ ONLY PUBLISHED
 
+        // Admin/Tenancy Logic
         if ($user->isAdmin()) {
             if ($companyId === null) {
                 $query->withoutGlobalScope(TenantScope::class);
@@ -88,7 +95,27 @@ class RecruitmentService implements RecruitmentServiceInterface
             }
         }
 
-        return $query->latest()->limit($limit)->get();
+        // Return a Collection (not pagination) for the dashboard cards
+        return $query->latest()->take($limit)->get();
+    }
+
+    public function getRecentCandidates(?int $companyId, int $limit = 10)
+    {
+        $query = \App\Models\Candidate::withoutGlobalScopes();
+
+        $query->with([
+            'recruitment' => fn($q) => $q->withoutGlobalScopes(),
+            'recruitment.department' => fn($q) => $q->withoutGlobalScopes()
+        ]);
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        } else {
+            $query->with(['company' => fn($q) => $q->withoutGlobalScopes()]);
+        }
+
+        // Returns Paginator (compatible now that we removed strict typing)
+        return $query->latest()->paginate($limit);
     }
 
     public function createRecruitment(array $data, ?int $companyId = null): Recruitment
@@ -133,5 +160,20 @@ class RecruitmentService implements RecruitmentServiceInterface
         }
 
         return $recruitment->delete();
+    }
+
+    public function getUpcomingInterviews(?int $companyId, int $limit = 5)
+    {
+        $query = \App\Models\Candidate::withoutGlobalScopes()
+            ->with('recruitment') // Load job title
+            ->whereNotNull('interview_scheduled_at')
+            ->where('interview_scheduled_at', '>=', now()) // Only future/today
+            ->orderBy('interview_scheduled_at', 'asc'); // Sooner first
+
+        if ($companyId) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query->take($limit)->get();
     }
 }

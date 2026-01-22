@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Backend\TelegramWebhookController;
+use App\Http\Controllers\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -8,5 +8,5 @@ use Illuminate\Support\Facades\Route;
 // Telegram Webhook
 ///////////////////////////////////////////////////
 
-Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handleWebhook'])
-    ->name('telegram.webhook');
+// Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handleWebhook'])
+//     ->name('telegram.webhook');

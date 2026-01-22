@@ -14,6 +14,7 @@
         content="hr dashboard, admin template, hr management, employee management, hr admin panel, gxon bootstrap dashboard, hr software ui, hrm dashboard, bootstrap hr template, responsive, bootstrap hr template, light mode, dark mode">
     <meta name="description"
         content="GXON is a professional and modern HR Management Laravel Admin Dashboard Template built with Bootstrap. It includes light and dark modes, and is ideal for managing employees, attendance, payroll, recruitment, and more — perfect for HR software and admin panels.">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- end::GXON Meta Basic -->
 
     <!-- begin::GXON Meta Social -->
@@ -102,10 +103,10 @@
         <div class="app-sidebar-end">
             <ul class="sidebar-list">
                 <li>
-                    <a href="task-management.html">
+                    <a href="{{ route('admin.onboarding.index') }}">
                         <div
                             class="avatar avatar-sm bg-warning shadow-sharp-warning rounded-circle text-white mx-auto mb-2">
-                            <i class="fi fi-rr-to-do"></i>
+                            <i class="fa-solid fa-list-check"></i>
                         </div>
                         <span class="text-dark">Task</span>
                     </a>
@@ -114,7 +115,7 @@
                     <a href="faqs.html">
                         <div
                             class="avatar avatar-sm bg-secondary shadow-sharp-secondary rounded-circle text-white mx-auto mb-2">
-                            <i class="fi fi-rr-interrogation"></i>
+                            <i class="fa-regular fa-circle-question"></i>
                         </div>
                         <span class="text-dark">Help</span>
                     </a>
@@ -122,7 +123,7 @@
                 <li>
                     <a href="calendar.html">
                         <div class="avatar avatar-sm bg-info shadow-sharp-info rounded-circle text-white mx-auto mb-2">
-                            <i class="fi fi-rr-calendar"></i>
+                            <i class="fa-regular fa-calendar-days"></i>
                         </div>
                         <span class="text-dark">Event</span>
                     </a>
@@ -130,7 +131,7 @@
                 <li>
                     <a href="javascript:void(0);">
                         <div class="avatar avatar-sm bg-gray shadow-sharp-gray rounded-circle text-white mx-auto mb-2">
-                            <i class="fi fi-rr-settings"></i>
+                            <i class="fa-solid fa-gear"></i>
                         </div>
                         <span class="text-dark">Settings</span>
                     </a>
