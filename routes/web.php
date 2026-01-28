@@ -25,14 +25,34 @@ Route::middleware('auth')->group(function () {
 // Telegram WiFi Verification (public routes)
 //////////////////////////////////////////////////
 
-Route::get('/telegram/verify-wifi/{attendance}', [WiFiVerificationController::class, 'show'])
-    ->name('telegram.verify-wifi');
-Route::post('/telegram/verify-wifi/{attendance}', [WiFiVerificationController::class, 'verify'])
-    ->name('telegram.verify-wifi.process');
+Route::get('/telegram/verify-wifi/{attendance_id}', function ($attendanceId) {
+    $ip = request()->ip();
+    $attendance = \App\Models\Attendance::find($attendanceId);
 
+    if (!$attendance) {
+        return view('telegram.wifi-error', ['message' => 'Attendance record not found']);
+    }
 
-// Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
-Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
+    $networks = \App\Models\OfficeWifiNetwork::where('company_id', $attendance->company_id)
+        ->where('is_active', true)
+        ->get();
+
+    foreach ($networks as $network) {
+        if ($network->isIpInRange($ip)) {
+            $attendance->update([
+                'is_wifi_verified' => true,
+                'check_in_ip' => $ip
+            ]);
+            return view('telegram.wifi-success');
+        }
+    }
+
+    return view('telegram.wifi-error', [
+        'message' => 'Not connected to office WiFi',
+        'ip' => $ip
+    ]);
+})->name('telegram.verify-wifi');
+
 
 //////////////////////////////////////////////////
 // Employee Task Controller (public routes)

@@ -49,7 +49,8 @@ return [
     |
     */
     'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
-
+    'debug_chat_id' => env('TELEGRAM_DEBUG_CHAT_ID'),
+    'bot_username' => env('TELEGRAM_BOT_NAME'),
     /*
     |--------------------------------------------------------------------------
     | Bots Configuration (for irazasyed/telegram-bot-sdk)

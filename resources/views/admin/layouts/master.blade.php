@@ -74,7 +74,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/styles.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/custom.css') }}">
 
-    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ config('services.yandex.map_key') }}&lang=en_US"></script>
+
     <!-- end::GXON Required Stylesheet -->
 
     <!-- DataTables CSS -->
@@ -155,20 +155,6 @@
                         <p class="mb-0">© <span class="currentYear">2025</span> GXON. Proudly powered by <a
                                 href="javascript:void(0);">LayoutDrop</a>.</p>
                     </div>
-                    <div class="col-lg-6 col-md-5">
-                        <ul
-                            class="d-flex list-inline mb-0 gap-3 flex-wrap justify-content-center justify-content-md-end">
-                            <li>
-                                <a class="text-body" href="https://gxon.layoutdrop.com/laravel/demo">Home</a>
-                            </li>
-                            <li>
-                                <a class="text-body" href="faqs.html">Faq's</a>
-                            </li>
-                            <li>
-                                <a class="text-body" href="faqs.html">Support</a>
-                            </li>
-                        </ul>
-                    </div>
                 </div>
             </div>
         </footer>
@@ -192,15 +178,17 @@
     <script src="{{ asset('assets/js/appSettings.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
     <script src="{{ asset('assets/js/datatable.js') }}"></script>
-
+    <script src="{{ asset('assets/js/getlocation.js') }}"></script>
     <!-- jQuery and DataTables JS -->
     {{-- <script src="https://cdn.datatables.net/2.3.2/js/dataTables.min.js"></script> --}}
     <!-- End jQuery and DataTables JS -->
 
+    <!-- Yandex Maps - Load ONCE here -->
+    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ config('services.yandex.map_key') }}&lang=en_US"
+        type="text/javascript"></script>
 
-
+    <!-- Page-specific scripts -->
     @stack('scripts')
-    <!-- end::GXON Page Scripts -->
 </body>
 
 <!-- Mirrored from gxon.layoutdrop.com/laravel/demo/ by HTTrack Website Copier/3.x [XR&CO'2014], Tue, 30 Dec 2025 12:17:19 GMT -->

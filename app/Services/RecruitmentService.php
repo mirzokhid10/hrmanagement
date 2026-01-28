@@ -164,11 +164,14 @@ class RecruitmentService implements RecruitmentServiceInterface
 
     public function getUpcomingInterviews(?int $companyId, int $limit = 5)
     {
+
         $query = \App\Models\Candidate::withoutGlobalScopes()
-            ->with('recruitment') // Load job title
+            ->with(['recruitment' => function ($q) {
+                $q->withoutGlobalScopes()->withTrashed();
+            }])
             ->whereNotNull('interview_scheduled_at')
-            ->where('interview_scheduled_at', '>=', now()) // Only future/today
-            ->orderBy('interview_scheduled_at', 'asc'); // Sooner first
+            ->where('interview_scheduled_at', '>=', now()->startOfDay())
+            ->orderBy('interview_scheduled_at', 'asc');
 
         if ($companyId) {
             $query->where('company_id', $companyId);

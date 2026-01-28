@@ -158,7 +158,7 @@
                                             <button
                                                 class="btn btn-white btn-sm btn-shadow btn-icon waves-effect dropdown-toggle"
                                                 type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <i class="fi fi-rr-menu-dots"></i>
+                                                <i class="fa-solid fa-ellipsis-vertical"></i>
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end">
                                                 <li>

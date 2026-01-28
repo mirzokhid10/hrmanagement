@@ -24,6 +24,7 @@ return [
     'yandex' => [
         'map_key' => env('YANDEX_MAP_API_KEY'),
     ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
@@ -46,5 +47,11 @@ return [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'bot_username' => env('TELEGRAM_BOT_NAME'), // Add this
     ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
+
 
 ];

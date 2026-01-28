@@ -4,48 +4,41 @@ namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\Department;
-use Illuminate\Http\Request;
 use App\Models\OfficeLocation;
+use App\Models\OfficeWifiNetwork;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class OfficeLocationController extends Controller
 {
     public function index()
     {
-        // Authorize viewing the list of office locations
-        // Pass the class name as the second argument when checking general permissions (not specific instance)
-        /** @var \App\Models\User $user */
-        // $this->authorize('viewAny', OfficeLocation::class);
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $query = OfficeLocation::query()->with('company');
+        // This will be filtered by TenantScope for non-admins automatically
+        $locations = OfficeLocation::with('company')->get();
+        $wifis = OfficeWifiNetwork::with('company', 'officeLocation')->get();
 
-        if (!$user->isAdmin()) {
-            // If not a super admin, filter by the user's company_id
-            // Note: The policy `viewAny` already checked if they *can* view,
-            // this part *filters* what they *do* view.
-            $query->where('company_id', $user->company_id); // Using $user->company_id for consistency with policy
+        $companies = collect();
+        if ($user->isAdmin()) {
+            $companies = Company::pluck('name', 'id');
         }
 
-        $locations = $query->orderBy('is_primary', 'desc')
-            ->orderBy('name')
-            ->get();
+        // Get current IP (example, replace with actual logic to get user's public IP)
+        $currentIp = request()->ip();
 
-        return view('admin.office-location.index', compact('locations'));
+        return view('admin.attendance.settings', compact('locations', 'wifis', 'companies', 'currentIp'));
     }
 
     public function create()
     {
-        // Authorize creating an office location
-        // $this->authorize('create', OfficeLocation::class);
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $companies = collect();
 
+        $companies = collect();
         if ($user->isAdmin()) {
             $companies = Company::pluck('name', 'id');
         }
@@ -55,9 +48,6 @@ class OfficeLocationController extends Controller
 
     public function store(Request $request)
     {
-        // Authorize storing an office location
-        // $this->authorize('create', OfficeLocation::class);
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
@@ -76,38 +66,51 @@ class OfficeLocationController extends Controller
             $rules['company_id'] = 'required|exists:companies,id';
         }
 
-        $validated = $request->validate($rules);
+        try {
+            $validated = $request->validate($rules);
 
-        $validated['is_active'] = $request->has('is_active');
-        $validated['is_primary'] = $request->has('is_primary');
+            // Set boolean fields based on checkbox presence
+            $validated['is_active'] = $request->has('is_active');
+            $validated['is_primary'] = $request->has('is_primary');
 
-        if ($user->isAdmin()) {
-            $companyId = $validated['company_id'];
-        } else {
-            $companyId = $user->company_id; // HR manager's company_id
+            // If user is admin and provided company_id, use it.
+            // Otherwise, the model's 'creating' event will handle setting tenant()->id.
+            if ($user->isAdmin() && $request->has('company_id')) {
+                $companyId = $validated['company_id'];
+            } else {
+                // For non-admins, company_id is not expected in the request.
+                // The model's booted method (static::creating) will automatically set model->company_id = tenant()->id;
+                $companyId = tenant()->id; // Fallback, though model event should handle it if not explicitly set
+            }
+            $validated['company_id'] = $companyId;
+
+            // Handle primary status: if new location is primary, set others to false for the same company
+            if ($validated['is_primary']) {
+                OfficeLocation::where('company_id', $validated['company_id'])
+                    ->update(['is_primary' => false]);
+            }
+
+            OfficeLocation::create($validated);
+
+            notify()->success('Office location created successfully!');
+            return redirect()->route('admin.office-location.index');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (AuthorizationException $e) {
+            notify()->error($e->getMessage() ?: 'You are not authorized to create office locations.');
+            return redirect()->back();
+        } catch (\Exception $e) {
+            notify()->error('An unexpected error occurred while creating the office location. Please try again.');
+            return redirect()->back();
         }
-        $validated['company_id'] = $companyId;
-
-        if ($validated['is_primary']) {
-            OfficeLocation::where('company_id', $validated['company_id'])
-                ->update(['is_primary' => false]);
-        }
-
-        OfficeLocation::create($validated);
-
-        notify()->success('Office location created successfully!');
-        return redirect()->route('admin.office-location.index');
     }
 
     public function edit(OfficeLocation $officeLocation)
     {
-        // Authorize updating this specific office location
-        // $this->authorize('update', $officeLocation); // Policy receives $user and $officeLocation
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $companies = collect();
 
+        $companies = collect();
         if ($user->isAdmin()) {
             $companies = Company::pluck('name', 'id');
         }
@@ -117,9 +120,6 @@ class OfficeLocationController extends Controller
 
     public function update(Request $request, OfficeLocation $officeLocation)
     {
-        // Authorize updating this specific office location
-        // $this->authorize('update', $officeLocation); // Policy receives $user and $officeLocation
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
@@ -127,37 +127,65 @@ class OfficeLocationController extends Controller
             'name' => 'required|string|max:255',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'radius_meters' => 'required|integer|min:10|max:1000',
+            'radius_meters' => 'required|integer|min="10"|max="1000"',
             'address' => 'nullable|string|max:500',
             'is_active' => 'boolean',
             'is_primary' => 'boolean',
         ];
 
-        $validated = $request->validate($rules);
-
-        $validated['is_active'] = $request->has('is_active');
-        $validated['is_primary'] = $request->has('is_primary');
-
-        if ($validated['is_primary']) {
-            OfficeLocation::where('company_id', $officeLocation->company_id)
-                ->where('id', '!=', $officeLocation->id)
-                ->update(['is_primary' => false]);
+        // If the user is a super admin, allow them to update company_id (careful with this)
+        // If you don't want admins to change company_id after creation, remove this rule.
+        if ($user->isAdmin()) {
+            $rules['company_id'] = 'required|exists:companies,id';
         }
 
-        $officeLocation->update($validated);
+        try {
+            $validated = $request->validate($rules);
 
-        notify()->success('Office location updated successfully!');
-        return redirect()->route('admin.office-location.index');
+            $validated['is_active'] = $request->has('is_active');
+            $validated['is_primary'] = $request->has('is_primary');
+
+            // If user is admin and provided company_id, update it.
+            if ($user->isAdmin() && $request->has('company_id')) {
+                $officeLocation->company_id = $request->input('company_id');
+            }
+
+            // Handle primary status: if this location is primary, set others to false for the same company
+            if ($validated['is_primary']) {
+                OfficeLocation::where('company_id', $officeLocation->company_id)
+                    ->where('id', '!=', $officeLocation->id)
+                    ->update(['is_primary' => false]);
+            }
+
+            $officeLocation->update($validated);
+
+            notify()->success('Office location updated successfully!');
+            return redirect()->route('admin.office-location.index');
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (AuthorizationException $e) {
+            notify()->error($e->getMessage() ?: 'You are not authorized to update this office location.');
+            return redirect()->back();
+        } catch (\Exception $e) {
+            notify()->error('An unexpected error occurred while updating the office location. Please try again.');
+            return redirect()->back();
+        }
     }
 
     public function destroy(OfficeLocation $officeLocation)
     {
-        // Authorize deleting this specific office location
-        // $this->authorize('delete', $officeLocation); // Policy receives $user and $officeLocation
 
-        $officeLocation->delete();
+        try {
+            $officeLocation->delete();
 
-        notify()->success('Office location deleted successfully!');
-        return redirect()->route('admin.office-location.index');
+            notify()->success('Office location deleted successfully!');
+            return redirect()->route('admin.office-location.index');
+        } catch (AuthorizationException $e) {
+            notify()->error($e->getMessage() ?: 'You are not authorized to delete this office location.');
+            return redirect()->back();
+        } catch (\Exception $e) {
+            notify()->error('An unexpected error occurred while deleting the office location. Please try again.');
+            return redirect()->back();
+        }
     }
 }

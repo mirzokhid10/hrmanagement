@@ -31,7 +31,7 @@ class OfficeLocation extends Model
         static::addGlobalScope(new TenantScope);
 
         static::creating(function ($model) {
-            if (!$model->company_id && tenant()) {
+            if (empty($model->company_id) && tenant()) {
                 $model->company_id = tenant()->id;
             }
         });

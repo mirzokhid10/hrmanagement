@@ -301,8 +301,14 @@
                         <div class="d-flex justify-content-between gap-2 pt-1 mb-3">
                             <div class="text-start">
                                 <span class="text-1xs">Salary</span>
-                                <span
-                                    class="text-sm text-dark d-block fw-semibold">{{ $item->salary_range ?? 'Negotiable' }}</span>
+                                <span class="font-mono font-semibold text-gray-700">
+                                    @if (is_numeric($item->salary_range))
+                                        {{ number_format((float) $item->salary_range, 0, '.', ' ') }}
+                                        <span class="text-xs text-gray-400">UZS</span>
+                                    @else
+                                        <span class="text-gray-400 text-xs italic">Not specified</span>
+                                    @endif
+                                </span>
                             </div>
                         </div>
                         <a href="#" class="btn btn-primary waves-effect waves-light w-100">See Job Post</a>
@@ -332,7 +338,7 @@
                                 <th class="minw-150px">Contact</th>
                                 <th class="minw-150px">Status</th>
                                 <th class="minw-200px">Interview Schedule</th>
-                                <th class="minw-100px text-end">Action</th>
+                                <th class="minw-100px text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody>

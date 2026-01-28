@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\HHruService;
 use Illuminate\Support\Facades\Storage;
+use App\Services\AI\GeminiService;
 
 class RecruitmentController extends Controller
 {
@@ -61,7 +62,11 @@ class RecruitmentController extends Controller
         $companyIdForQuery = $user->isAdmin() ? null : $user->company_id;
 
         // Get 15 per page for the table
-        $recruitments = $this->recruitmentService->getPaginatedRecruitments($companyIdForQuery, 15);
+        $recruitments = $this->recruitmentService->getPaginatedRecruitments($companyIdForQuery, 10);
+
+        // $candidates = Candidate::where('recruitment_id', $recruitmentId)
+        //     ->where('status', 'active')
+        //     ->get();
 
         return view('admin.recruitment.list', compact('recruitments'));
     }
@@ -300,5 +305,32 @@ class RecruitmentController extends Controller
         ]);
 
         return back()->with('success', 'Interview schedule updated successfully.');
+    }
+
+    public function analyzeCandidate(GeminiService $ai, $candidateId)
+    {
+        $candidate = Candidate::find($candidateId);
+
+        // The Prompt
+        $prompt = "
+        Analyze this candidate for the position of Senior Laravel Developer.
+        Resume Text: {$candidate->resume_text}
+
+        Return JSON with:
+        - score (0-100)
+        - summary (string, 1 sentence in Uzbek)
+        - skills_found (array)";
+
+        // The Magic
+        $analysis = $ai->askJson($prompt);
+
+        // Result is already an array!
+        // $analysis['score'] -> 85
+        // $analysis['summary'] -> "Nomzod Laravel bo'yicha kuchli bilimga ega..."
+
+        $candidate->update([
+            'ai_score' => $analysis['score'] ?? 0,
+            'ai_data' => $analysis
+        ]);
     }
 }

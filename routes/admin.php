@@ -3,6 +3,7 @@
 use App\Http\Controllers\Backend\AdminDashboardController;
 use App\Http\Controllers\Backend\AnnouncementController;
 use App\Http\Controllers\Backend\AttendanceController;
+use App\Http\Controllers\Backend\AttendanceSettingsController;
 use App\Http\Controllers\Backend\BotSettingsController;
 use App\Http\Controllers\Backend\DepartmentController;
 use App\Http\Controllers\Backend\DocumentController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Backend\OfficeWifiController;
 use App\Http\Controllers\Backend\OnboardingController;
 use App\Http\Controllers\Backend\OrgChartController;
 use App\Http\Controllers\Backend\RecruitmentController;
+use App\Http\Controllers\Backend\RiskAnalysisController;
 use App\Http\Controllers\Backend\TimeOffController;
 use Illuminate\Support\Facades\Route;
 use Telegram\Bot\Laravel\Facades\Telegram;
@@ -100,8 +102,16 @@ Route::resource('office-wifi', OfficeWifiController::class);
 
 Route::get('/attendance', [AttendanceController::class, 'index'])
     ->name('attendance.index');
-Route::get('/attendance/{attendance}', [AttendanceController::class, 'show'])
-    ->name('attendance.show');
+
+Route::get('/attendance/settings', [AttendanceSettingsController::class, 'index'])->name('attendance.settings.index');
+
+// Location Routes
+Route::post('/attendance/settings/location', [AttendanceSettingsController::class, 'storeLocation'])->name('attendance.settings.location.store');
+Route::delete('/attendance/settings/location/{id}', [AttendanceSettingsController::class, 'destroyLocation'])->name('attendance.settings.location.destroy');
+
+// WiFi Routes
+Route::post('/attendance/settings/wifi', [AttendanceSettingsController::class, 'storeWifi'])->name('attendance.settings.wifi.store');
+Route::delete('/attendance/settings/wifi/{id}', [AttendanceSettingsController::class, 'destroyWifi'])->name('attendance.settings.wifi.destroy');
 
 //////////////////////////////////////////////////
 //  Documents Management Routes
@@ -184,5 +194,7 @@ Route::get('org-chart', [OrgChartController::class, 'index'])->name('org-chart.i
 Route::get('org-chart/data', [OrgChartController::class, 'data'])->name('org-chart.data');
 
 //////////////////////////////////////////////////
-//  Meetings Management
+//  Risks Management
 //////////////////////////////////////////////////
+
+Route::get('/risks', [RiskAnalysisController::class, 'index'])->name('risks.index');
