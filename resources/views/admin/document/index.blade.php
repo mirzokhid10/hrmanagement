@@ -5,28 +5,28 @@
     <div class="app-page-head d-flex flex-wrap gap-3 align-items-center justify-content-between">
         <div class="clearfix">
             <h1 class="app-page-title">
-                Documents for <span class="text-primary">{{ $employee->full_name }}</span>
+                {{ __('Documents for') }} <span class="text-primary">{{ $employee->full_name }}</span>
             </h1>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item">
-                        <a href="{{ route('admin.dashboard') }}">Dashboard</a>
+                        <a href="{{ route('admin.dashboard') }}">{{ __('Dashboard') }}</a>
                     </li>
                     <li class="breadcrumb-item">
-                        <a href="{{ route('admin.employee.index') }}">Employees</a>
+                        <a href="{{ route('admin.employee.index') }}">{{ __('Employees') }}</a>
                     </li>
-                    <li class="breadcrumb-item active" aria-current="page">Documents</li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ __('Documents') }}</li>
                 </ol>
             </nav>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.employee.index') }}" class="btn btn-outline-light waves-effect">
-                <i class="fi fi-rr-arrow-left me-1"></i> Back
+                <i class="fi fi-rr-arrow-left me-1"></i> {{ __('Back') }}
             </a>
             {{-- Trigger Modal for Upload --}}
             <button type="button" class="btn btn-primary waves-effect waves-light" data-bs-toggle="modal"
                 data-bs-target="#uploadDocumentModal">
-                <i class="fi fi-rr-upload me-1"></i> Upload Document
+                <i class="fi fi-rr-upload me-1"></i> {{ __('Upload Document') }}
             </button>
         </div>
     </div>
@@ -40,9 +40,9 @@
                         <i class="fi fi-rr-folder-open fs-3"></i>
                     </div>
                     <div>
-                        <h5 class="mb-1 text-primary fw-bold">Employee File</h5>
+                        <h5 class="mb-1 text-primary fw-bold">{{ __('Employee File') }}</h5>
                         <p class="mb-0 text-dark opacity-75">
-                            Manage contracts, ID cards, and other confidential files for
+                            {{ __('Manage contracts, ID cards, and other confidential files for') }}
                             <strong>{{ $employee->full_name }}</strong>.
                         </p>
                     </div>
@@ -54,7 +54,7 @@
     {{-- Documents List --}}
     <div class="card">
         <div class="card-header border-0 pt-3 pb-0">
-            <h5 class="card-title">Uploaded Files ({{ $documents->count() }})</h5>
+            <h5 class="card-title">{{ __('Uploaded Files') }} ({{ $documents->count() }})</h5>
         </div>
         <div class="card-body">
             @if ($documents->count() > 0)
@@ -62,12 +62,12 @@
                     <table class="table align-middle table-hover">
                         <thead class="table-light">
                             <tr>
-                                <th scope="col">Document Name</th>
-                                <th scope="col">Type</th>
-                                <th scope="col">Size</th>
-                                <th scope="col">Uploaded At</th>
-                                <th scope="col">Expiry Date</th>
-                                <th scope="col" class="text-end">Actions</th>
+                                <th scope="col">{{ __('Document Name') }}</th>
+                                <th scope="col">{{ __('Type') }}</th>
+                                <th scope="col">{{ __('Size') }}</th>
+                                <th scope="col">{{ __('Uploaded At') }}</th>
+                                <th scope="col">{{ __('Expiry Date') }}</th>
+                                <th scope="col" class="text-end">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -96,15 +96,16 @@
                                     <td>
                                         <span
                                             class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
-                                            {{ ucfirst(str_replace('_', ' ', $doc->type)) }}
+                                            {{-- Translate the dynamically generated string (e.g., "Id card") --}}
+                                            {{ __(ucfirst(str_replace('_', ' ', $doc->type))) }}
                                         </span>
                                     </td>
                                     <td>{{ $doc->size_kb }} KB</td>
-                                    <td>{{ $doc->created_at->format('d M, Y') }}</td>
+                                    <td>{{ $doc->created_at->translatedFormat('d M, Y') }}</td>
                                     <td>
                                         @if ($doc->expiry_date)
                                             <span class="{{ $doc->is_expired ? 'text-danger fw-bold' : 'text-success' }}">
-                                                {{ $doc->expiry_date->format('d M, Y') }}
+                                                {{ $doc->expiry_date->translatedFormat('d M, Y') }}
                                                 @if ($doc->is_expired)
                                                     <i class="fi fi-rr-exclamation ms-1"></i>
                                                 @endif
@@ -116,7 +117,8 @@
                                     <td class="text-end">
                                         <div class="btn-group">
                                             <a href="{{ route('admin.document.download', $doc->id) }}"
-                                                class="btn btn-sm btn-icon btn-subtle-primary" title="Download">
+                                                class="btn btn-sm btn-icon btn-subtle-primary"
+                                                title="{{ __('Download') }}">
                                                 <i class="fa-solid fa-download"></i>
                                             </a>
                                             <form action="{{ route('admin.document.destroy', $doc->id) }}" method="POST"
@@ -124,7 +126,7 @@
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="button" class="btn btn-sm btn-icon btn-subtle-danger"
-                                                    onclick="confirmDelete(this)" title="Delete">
+                                                    onclick="confirmDelete(this)" title="{{ __('Delete') }}">
                                                     <i class="fa-regular fa-trash-can"></i>
                                                 </button>
                                             </form>
@@ -140,8 +142,8 @@
                     <div class="mb-3">
                         <i class="fi fi-rr-folder text-muted fs-1 opacity-50"></i>
                     </div>
-                    <h5 class="text-muted">No documents found</h5>
-                    <p class="text-muted small">Upload contracts, ID proofs, or resumes for this employee.</p>
+                    <h5 class="text-muted">{{ __('No documents found') }}</h5>
+                    <p class="text-muted small">{{ __('Upload contracts, ID proofs, or resumes for this employee.') }}</p>
                 </div>
             @endif
         </div>
@@ -152,7 +154,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Upload Document</h5>
+                    <h5 class="modal-title">{{ __('Upload Document') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('admin.document.store') }}" method="POST" enctype="multipart/form-data">
@@ -161,38 +163,40 @@
 
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Document Name <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Document Name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="name" class="form-control"
-                                placeholder="e.g. Employment Contract 2024" required>
+                                placeholder="{{ __('e.g. Employment Contract 2024') }}" required>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Document Type') }} <span
+                                    class="text-danger">*</span></label>
                             <select name="type" class="form-select" required>
-                                <option value="" selected disabled>Select Type</option>
-                                <option value="contract">Contract / Offer Letter</option>
-                                <option value="id_card">ID Card / Passport</option>
-                                <option value="resume">Resume / CV</option>
-                                <option value="other">Other</option>
+                                <option value="" selected disabled>{{ __('Select Type') }}</option>
+                                <option value="contract">{{ __('Contract / Offer Letter') }}</option>
+                                <option value="id_card">{{ __('ID Card / Passport') }}</option>
+                                <option value="resume">{{ __('Resume / CV') }}</option>
+                                <option value="other">{{ __('Other') }}</option>
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">File <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('File') }} <span class="text-danger">*</span></label>
                             <input type="file" name="file" class="form-control" required
                                 accept=".pdf,.doc,.docx,.jpg,.png">
-                            <small class="text-muted">Max size: 10MB. Allowed: PDF, DOC, JPG, PNG.</small>
+                            <small class="text-muted">{{ __('Max size: 10MB. Allowed: PDF, DOC, JPG, PNG.') }}</small>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Expiry Date (Optional)</label>
+                            <label class="form-label">{{ __('Expiry Date (Optional)') }}</label>
                             <input type="date" name="expiry_date" class="form-control">
-                            <small class="text-muted">Useful for Passports, Visas, or Contracts.</small>
+                            <small class="text-muted">{{ __('Useful for Passports, Visas, or Contracts.') }}</small>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Upload</button>
+                        <button type="button" class="btn btn-light"
+                            data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('Upload') }}</button>
                     </div>
                 </form>
             </div>
@@ -203,7 +207,7 @@
 @push('scripts')
     <script>
         function confirmDelete(btn) {
-            if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+            if (confirm("{{ __('Are you sure you want to delete this document?') }}")) {
                 btn.closest('form').submit();
             }
         }

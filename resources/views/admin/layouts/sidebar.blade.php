@@ -29,7 +29,7 @@
             <x-nav-item route="admin.time-offs.index" icon="fa-solid fa-plane-departure" label="Time Off" />
 
             <!-- SECTION: RECRUITMENT -->
-            @role('admin|hr-manager')
+            @role('admin|hr')
                 <li class="menu-heading"><span class="menu-label">Recruitment</span></li>
 
                 <li class="menu-item menu-arrow {{ request()->routeIs('admin.recruitment.*') ? 'open' : '' }}">

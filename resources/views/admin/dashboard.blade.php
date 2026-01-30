@@ -3,11 +3,11 @@
 @section('content')
     <div class="app-page-head d-flex flex-wrap gap-3 align-items-center justify-content-between">
         <div class="clearfix">
-            <h1 class="app-page-title">Dashboard</h1>
+            <h1 class="app-page-title">{{ __('dashboard') }}</h1>
             <span><i class="fa-regular fa-calendar me-1"></i> {{ now()->format('D, M d, Y') }} </span>
         </div>
         <a href="{{ route('admin.employee.create') }}" class="btn btn-primary waves-effect waves-light">
-            <i class="fa-solid fa-plus me-1"></i> Add Employee
+            <i class="fa-solid fa-plus me-1"></i> {{ __('add_employee') }}
         </a>
     </div>
 
@@ -23,11 +23,11 @@
                                 <i class="fa-solid fa-user-group"></i>
                             </div>
                             <h3 class="fs-1">{{ $stats['total_employees'] }}</h3>
-                            <h6 class="mb-0">Total Employee</h6>
+                            <h6 class="mb-0">{{ __('total_employee') }}</h6>
                             <small class="fw-medium">
                                 <span class="text-success">
                                     <i class="fi fi-rr-arrow-small-up scale-3x"></i> +5%
-                                </span> Last Month
+                                </span> {{ __('last_month') }}
                             </small>
                         </div>
                     </div>
@@ -39,11 +39,11 @@
                                 <i class="fa-solid fa-user-plus"></i>
                             </div>
                             <h3 class="fs-1">{{ $stats['new_hires'] }}</h3>
-                            <h6 class="mb-0">New Employee</h6>
+                            <h6 class="mb-0">{{ __('new_employee') }}</h6>
                             <small class="fw-medium">
                                 <span class="text-success">
                                     <i class="fi fi-rr-arrow-small-up scale-3x"></i> +3.2%
-                                </span> Last Month
+                                </span> {{ __('last_month') }}
                             </small>
                         </div>
                     </div>
@@ -55,11 +55,11 @@
                                 <i class="fa-solid fa-user-xmark"></i>
                             </div>
                             <h3 class="fs-1">{{ $stats['on_leave_today'] }}</h3>
-                            <h6 class="mb-0">On Leave</h6>
+                            <h6 class="mb-0">{{ __('on_leave') }}</h6>
                             <small class="fw-medium">
                                 <span class="text-danger">
                                     <i class="fi fi-rr-arrow-small-down scale-3x"></i> -2%
-                                </span> Last Month
+                                </span> {{ __('last_month') }}
                             </small>
                         </div>
                     </div>
@@ -71,11 +71,11 @@
                                 <i class="fa-solid fa-briefcase"></i>
                             </div>
                             <h3 class="fs-1">{{ $stats['job_applicants'] }}</h3>
-                            <h6 class="mb-0">Job Applicants</h6>
+                            <h6 class="mb-0">{{ __('job_applicants') }}</h6>
                             <small class="fw-medium">
                                 <span class="text-success">
                                     <i class="fi fi-rr-arrow-small-down scale-3x"></i> +8%
-                                </span> Last Month
+                                </span> {{ __('last_month') }}
                             </small>
                         </div>
                     </div>
@@ -87,11 +87,11 @@
                                 <i class="fa-solid fa-alarm-clock"></i>
                             </div>
                             <h3 class="fs-1">1017</h3>
-                            <h6 class="mb-0">Over Time</h6>
+                            <h6 class="mb-0">{{ __('over_time') }}</h6>
                             <small class="fw-medium">
                                 <span class="text-danger">
                                     <i class="fi fi-rr-arrow-small-down scale-3x"></i> -8%
-                                </span> Last Month
+                                </span>{{ __('last_month') }}
                             </small>
                         </div>
                     </div>
@@ -103,16 +103,19 @@
             <div class="card overflow-hidden z-1">
                 <div class="card-body">
                     <div class="w-75">
-                        <h6 class="card-title">Create Announcement</h6>
-                        <p>Make a announcement to your employee</p>
+                        <h6 class="card-title">{{ __('create_announcement') }}</h6>
+                        <p>{{ __('make_announcement_desc') }}</p>
+
                     </div>
                     <img src="{{ asset('assets/images/media1.svg') }}" alt=""
                         class="position-absolute bottom-0 end-0 z-n1">
                 </div>
                 <div class="card-footer border-0 pt-0">
                     <a href="{{ route('admin.announcements.index') }}"
-                        class="btn btn-outline-light waves-effect btn-shadow">Create Now <span><i
-                                class="fa-solid fa-bullhorn mx-1"></i></span></a>
+                        class="btn btn-outline-light waves-effect btn-shadow">
+                        {{ __('create_now') }}
+                        <i class="fa-solid fa-bullhorn mx-1"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -121,10 +124,10 @@
             <div class="card">
                 <div class="card-header d-flex align-items-center justify-content-between border-0">
                     <div class="d-flex align-items-center gap-2">
-                        <h6 class="card-title mb-0"> Retention Risks</h6>
-                        <span
-                            class="d-flex justify-items-center align-items-center badge rounded-pill bg-primary bg-opacity-10 text-primary">
-                            AI Beta
+                        <h6 class="card-title mb-0">{{ __('retention_risks') }}</h6>
+
+                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary">
+                            {{ __('ai_beta') }}
                         </span>
                     </div>
 
@@ -132,12 +135,12 @@
                     <div class="dropdown">
                         <button class="btn dropdown-toggle btn-white btn-shadow waves-effect btn-sm" type="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                            {{ request('company_name') ?? 'All Companies' }}
+                            {{ request('company_name') ?? __('all_companies') }}
                         </button>
                         <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="{{ route('dashboard') }}">All Companies</a>
-                            </li>
+                            <button class="btn dropdown-toggle btn-white btn-shadow btn-sm" type="button">
+                                {{ request('company_name') ?? __('all_companies') }}
+                            </button>
                             <li>
                                 <hr class="dropdown-divider">
                             </li>
@@ -159,9 +162,10 @@
                         <table class="table table-sm table-borderless table-row-rounded mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Employee</th>
-                                    <th>Score</th>
-                                    <th class="text-end pe-3">Action</th>
+                                    <th class="ps-3">{{ __('employee') }}</th>
+                                    <th>{{ __('score') }}</th>
+                                    <th class="text-end pe-3">{{ __('action') }}</th>
+
                                 </tr>
                             </thead>
                             <tbody>
@@ -186,20 +190,22 @@
                                                 <!-- Name & Details -->
                                                 <div class="ms-2 me-auto">
                                                     <h6 class="mb-0 text-dark">
-                                                        {{ $insight->employee->first_name ?? 'Unknown' }}
-                                                        {{ $insight->employee->last_name ?? '' }}
+                                                        <h6 class="mb-0 text-dark">
+                                                            {{ $insight->employee->first_name ?? __('unknown') }}
+                                                            {{ $insight->employee->last_name ?? '' }}
+                                                        </h6>
                                                     </h6>
-                                                    <div class="d-flex align-items-center justify-content-center gap-1">
+                                                    <div class="d-flex align-items-center justify-content-start gap-1">
                                                         <!-- Company Badge -->
                                                         @if (auth()->id() === 1)
                                                             <span
                                                                 class="badge bg-light text-secondary border px-1 d-flex justify-content-center align-items-center"
                                                                 style="font-size: 9px;">
-                                                                {{ $insight->employee->company->name ?? 'Unknown Co.' }}
+                                                                {{ $insight->employee->company->name ?? __('unknown_company') }}
                                                             </span>
                                                         @endif
                                                         <small class="text-muted" style="font-size: 11px;">
-                                                            {{ $insight->employee->job_title ?? 'No Title' }}
+                                                            {{ $insight->employee->job_title ?? __('no_title') }}
                                                         </small>
                                                     </div>
                                                 </div>
@@ -247,7 +253,7 @@
                                                 <ul class="dropdown-menu dropdown-menu-end">
                                                     <li>
                                                         <a class="dropdown-item" href="{{ route('admin.risks.index') }}">
-                                                            View Details
+                                                            {{ __('view_details') }}
                                                         </a>
                                                     </li>
                                                 </ul>
@@ -257,7 +263,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="3" class="text-center py-4">
-                                            <small class="text-muted">No risks detected for this filter.</small>
+                                            <small class="text-muted">{{ __('no_risks_detected') }}</small>
                                         </td>
                                     </tr>
                                 @endforelse
@@ -273,9 +279,9 @@
         <div class="col-xxl-7">
             <div class="card bg-gray bg-opacity-10 border-0 shadow-none">
                 <div class="card-header d-flex flex-wrap gap-3 align-items-center justify-content-between border-0 pb-0">
-                    <h6 class="card-title mb-0">Interview Schedule</h6>
+                    <h6 class="card-title mb-0">{{ __('no_interviews') }}</h6>
                     <div class="clearfix d-flex align-items-center">
-                        <a href="{{ route('admin.recruitment.index') }}" class="btn-link me-4">View All</a>
+                        <a href="{{ route('admin.recruitment.index') }}" class="btn-link me-4"> {{ __('view_all') }}</a>
                         {{-- <div class="dropdown">
                             <button class="btn dropdown-toggle btn-white btn-shadow waves-effect btn-sm" type="button"
                                 data-bs-toggle="dropdown" aria-expanded="false">
@@ -314,8 +320,8 @@
                                         </div>
                                         <div class="ms-2 me-auto">
                                             <h6 class="mb-0">{{ $interview->full_name }}</h6>
-                                            <small
-                                                class="text-body">{{ $interview->recruitment->title ?? 'General Interview' }}</small>
+                                            <small class="text-body">
+                                                {{ $interview->recruitment->title ?? __('general_interview') }}</small>
                                         </div>
                                         <div>
                                             <span
@@ -326,7 +332,7 @@
                                 @empty
                                     <div class="text-center py-5 text-muted">
                                         <i class="fa-solid fa-calendar-xmark fa-2x mb-2 opacity-50"></i>
-                                        <p class="mb-0">No interviews upcoming.</p>
+                                        <p class="mb-0">{{ __('no_interviews') }}</p>
                                     </div>
                                 @endforelse
 

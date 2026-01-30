@@ -4,8 +4,9 @@ namespace App\Services\Telegram;
 
 use App\Services\Telegram\Handlers\PublicHandler;
 use App\Services\Telegram\Handlers\EmployeeHandler;
-use App\Services\Telegram\Handlers\HRHandler;
-use App\Services\Telegram\Handlers\AdminHandler;
+use App\Services\Telegram\Handlers\Admin\HRHandler;
+use App\Services\Telegram\Handlers\Admin\AdminHandler;
+use App\Services\Telegram\Helpers\TelegramAuthChecker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Telegram\Bot\Laravel\Facades\Telegram;
@@ -69,15 +70,19 @@ class TelegramRouterService
         // Always answer callback to remove loading state
         Telegram::answerCallbackQuery(['callback_query_id' => $callback->getId()]);
 
-        // Universal cancel button
-        if ($data === 'cancel_wizard') {
-            $this->cancelAllWizards($chatId);
-            Telegram::sendMessage([
-                'chat_id' => $chatId,
-                'text' => '❌ Operation cancelled.'
-            ]);
-            $this->sendMainMenu($chatId, $auth);
-            return;
+        try {
+            Telegram::answerCallbackQuery(['callback_query_id' => $callback->getId()]);
+        } catch (\Exception $e) {
+            // Universal cancel button
+            if ($data === 'cancel_wizard') {
+                $this->cancelAllWizards($chatId);
+                Telegram::sendMessage([
+                    'chat_id' => $chatId,
+                    'text' => '❌ Operation cancelled.'
+                ]);
+                $this->sendMainMenu($chatId, $auth);
+                return;
+            }
         }
 
         // Route to appropriate handler based on callback prefix

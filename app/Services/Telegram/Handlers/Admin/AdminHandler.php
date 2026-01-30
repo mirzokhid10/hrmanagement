@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services\Telegram\Handlers;
+namespace App\Services\Telegram\Handlers\Admin;
 
 use App\Models\Company;
 use App\Services\Telegram\Helpers\TelegramKeyboardBuilder;
-use App\Services\Telegram\TelegramAuthChecker;
+use App\Services\Telegram\Helpers\TelegramAuthChecker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Telegram\Bot\Laravel\Facades\Telegram;

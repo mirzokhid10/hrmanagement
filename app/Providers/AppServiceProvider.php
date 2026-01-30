@@ -15,6 +15,8 @@ use App\Services\OnboardingService;
 use App\Services\RecruitmentService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Str;
+use Illuminate\Support\Number;
 
 
 class AppServiceProvider extends ServiceProvider
@@ -36,6 +38,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Str::macro('uzs', function ($amount) {
+            return number_format((float)$amount, 0, '.', ' ') . " so'm";
+        });
+
+        // Or using Laravel's Number helper (Laravel 10+)
+        Number::useLocale('uz');
         // Tell Laravel to use Bootstrap 5 for pagination links
         Paginator::useBootstrapFive();
 

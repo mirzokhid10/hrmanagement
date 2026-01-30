@@ -3,11 +3,11 @@
 @section('content')
     <div class="app-page-head d-flex flex-wrap gap-3 align-items-center justify-content-between">
         <div class="clearfix">
-            <h1 class="app-page-title">Announcements</h1>
+            <h1 class="app-page-title">{{ __('announcements') }}</h1>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item active">Announcements</li>
+                    <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">{{ __('dashboard') }}</a></li>
+                    <li class="breadcrumb-item active">{{ __('announcements') }}</li>
                 </ol>
             </nav>
         </div>
@@ -18,19 +18,20 @@
         <div class="col-md-4">
             <div class="card p-4">
                 <div class="card-header border-0 px-0 pt-0">
-                    <h5 class="card-title">📢 Post Announcement</h5>
+                    <h5 class="card-title">📢 {{ __('post_announcement') }}</h5>
                 </div>
                 <div class="card-body px-0">
                     <form action="{{ route('admin.announcements.store') }}" method="POST">
                         @csrf
 
                         {{-- 1. COMPANY SELECTOR (For Admin) --}}
-                        @if(Auth::user()->isAdmin())
+                        @if (Auth::user()->isAdmin())
                             <div class="mb-3">
-                                <label class="form-label">Company <span class="text-danger">*</span></label>
-                                <select name="company_id" id="company_id" class="form-select" onchange="loadCompanyData(this.value)" required>
-                                    <option value="" selected disabled>Select Company</option>
-                                    @foreach(\App\Models\Company::all() as $company)
+                                <label class="form-label">{{ __('company') }} <span class="text-danger">*</span></label>
+                                <select name="company_id" id="company_id" class="form-select"
+                                    onchange="loadCompanyData(this.value)" required>
+                                    <option value="" selected disabled>{{ __('select_company') }}</option>
+                                    @foreach (\App\Models\Company::all() as $company)
                                         <option value="{{ $company->id }}">{{ $company->name }}</option>
                                     @endforeach
                                 </select>
@@ -40,8 +41,9 @@
                         @endif
 
                         <div class="mb-3">
-                            <label class="form-label">Title <span class="text-danger">*</span></label>
-                            <input type="text" name="title" class="form-control" placeholder="e.g. Office Closed on Friday" required>
+                            <label class="form-label">{{ __('title') }} <span class="text-danger">*</span></label>
+                            <input type="text" name="title" class="form-control"
+                                placeholder="{{ __('announcement_title_placeholder') }}" required>
                         </div>
 
                         {{-- 2. AUDIENCE SELECTOR (Dropdown Style) --}}
@@ -57,11 +59,12 @@
                         {{-- 3. DEPARTMENT SELECTOR --}}
                         <div class="mb-3" id="dept_wrapper" style="display: none;">
                             <label class="form-label">Select Department <span class="text-danger">*</span></label>
-                            <select name="department_id" id="department_id" class="form-select" onchange="loadEmployeesInDept()">
+                            <select name="department_id" id="department_id" class="form-select"
+                                onchange="loadEmployeesInDept()">
                                 <option value="" selected disabled>Choose...</option>
                                 {{-- Populated via JS or initial load --}}
-                                @if(!Auth::user()->isAdmin())
-                                    @foreach($departments as $dept)
+                                @if (!Auth::user()->isAdmin())
+                                    @foreach ($departments as $dept)
                                         <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                                     @endforeach
                                 @endif
@@ -83,7 +86,8 @@
                         </div>
 
                         <div class="mb-3 form-check form-switch">
-                            <input class="form-check-input" type="checkbox" name="send_to_telegram" value="1" id="telegramCheck" checked>
+                            <input class="form-check-input" type="checkbox" name="send_to_telegram" value="1"
+                                id="telegramCheck" checked>
                             <label class="form-check-label" for="telegramCheck">
                                 <i class="fa-brands fa-telegram text-info"></i> Send to Telegram Bot
                             </label>
@@ -100,16 +104,16 @@
         {{-- RIGHT: Feed --}}
         <div class="col-md-8">
             {{-- Loop through announcements --}}
-                <div class="card mb-3">
-                    <div class="card-body">
-                    @foreach($announcements as $item)
+            <div class="card mb-3">
+                <div class="card-body">
+                    @foreach ($announcements as $item)
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <h5 class="card-title mb-1">{{ $item->title }}</h5>
                                 <div class="text-muted small mb-3">
                                     <i class="fi fi-rr-calendar me-1"></i> {{ $item->created_at->diffForHumans() }}
                                     <span class="mx-2">•</span>
-                                    @if($item->audience_type === 'company' || $item->audience_type === 'all')
+                                    @if ($item->audience_type === 'company' || $item->audience_type === 'all')
                                         <span class="badge bg-success-subtle text-success">Everyone</span>
                                     @elseif($item->audience_type === 'department')
                                         <span class="badge bg-info-subtle text-info">
@@ -124,7 +128,8 @@
                             </div>
 
                             {{-- Delete Button --}}
-                            <form action="{{ route('admin.announcements.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Delete this announcement?');">
+                            <form action="{{ route('admin.announcements.destroy', $item->id) }}" method="POST"
+                                onsubmit="return confirm('Delete this announcement?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-icon btn-action-danger">
@@ -139,8 +144,8 @@
                             <small class="text-muted">Posted by: {{ $item->creator->name ?? 'Unknown' }}</small>
                         </div>
                     @endforeach
-                    </div>
                 </div>
+            </div>
 
         </div>
     </div>

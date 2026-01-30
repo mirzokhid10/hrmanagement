@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Telegram\Handlers;
+namespace App\Services\Telegram\Handlers\Admin;
 
 use App\Models\Candidate;
 use App\Models\Department;
@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Recruitment;
 use App\Models\TimeOff;
 use App\Models\Attendance;
+use App\Services\Telegram\Handlers\EmployeeHandler;
 use App\Services\Telegram\Helpers\TelegramKeyboardBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;

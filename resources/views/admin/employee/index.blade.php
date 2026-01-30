@@ -9,25 +9,27 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item">
-                        <a href="{{ route('admin.dashboard') }}">Dashboard</a>
+                        <a href="{{ route('admin.dashboard') }}"> {{ __('dashboard') }}</a>
                     </li>
-                    <li class="breadcrumb-item active" aria-current="page">Employee</li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ __('employee') }}</li>
                 </ol>
             </nav>
         </div>
         {{-- Changed button to a link to the dedicated create page --}}
         <a href="{{ route('admin.employee.create') }}" class="btn btn-primary waves-effect waves-light">
-            <i class="fi fi-rr-plus me-1"></i> Add Employee
+            <i class="fi fi-rr-plus me-1"></i> {{ __('add_employee') }}
         </a>
     </div>
 
     <div class="card d-flex flex-row flex-wrap align-items-center h-auto mb-5">
         <ul class="nav nav-underline me-auto px-3 gap-2">
             <li class="nav-item">
-                <a class="nav-link border-3 py-3 px-2 active" href="javascript:void(0);">Employee</a>
+                <a class="nav-link border-3 py-3 px-2 active" href="javascript:void(0);">{{ __('employee') }}</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link border-3 py-3 px-2" href="leave.html">Leave Request</a> {{-- Placeholder --}}
+                <a class="nav-link border-3 py-3 px-2"
+                    href="{{ route('admin.recruitment.index') }}">{{ __('leave_request') }}</a>
+                {{-- Placeholder --}}
             </li>
         </ul>
         <div class="d-flex ps-3">
@@ -47,7 +49,7 @@
                 </button>
                 <input type="text" name="search" id="employeeSearchInput"
                     class="form-control form-control-lg ps-5 rounded-start-0 border-0 shadow-none bg-transparent"
-                    placeholder="Search Employee" value="{{ $searchTerm }}">
+                    placeholder="{{ __('search_employee') }}" value="{{ $searchTerm }}">
             </div>
         </div>
     </div>

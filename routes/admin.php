@@ -13,6 +13,9 @@ use App\Http\Controllers\Backend\MeetingController;
 use App\Http\Controllers\Backend\OfficeLocationController;
 use App\Http\Controllers\Backend\OfficeWifiController;
 
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Auth;
+
 use App\Http\Controllers\Backend\OnboardingController;
 use App\Http\Controllers\Backend\OrgChartController;
 use App\Http\Controllers\Backend\RecruitmentController;
@@ -198,3 +201,24 @@ Route::get('org-chart/data', [OrgChartController::class, 'data'])->name('org-cha
 //////////////////////////////////////////////////
 
 Route::get('/risks', [RiskAnalysisController::class, 'index'])->name('risks.index');
+
+
+//////////////////////////////////////////////////
+//  Language Management
+//////////////////////////////////////////////////
+
+Route::get('language/{locale}', function ($locale) {
+    if (in_array($locale, ['uz', 'ru', 'en'])) {
+        // 1. Save to Session
+        Session::put('locale', $locale);
+
+        // 2. Save to DB if user is logged in
+        if (Auth::check()) {
+            /** @var App\Model\User */
+            $user = Auth::user();
+            $user->locale = $locale;
+            $user->save();
+        }
+    }
+    return redirect()->back();
+})->name('language.switch');

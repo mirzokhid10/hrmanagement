@@ -26,13 +26,14 @@
                                     <li>
                                         <a href="{{ route('admin.document.index', $employee->id) }}"
                                             class="dropdown-item edit-employee-btn">
-                                            Docs
+                                            {{ __('docs') }}
                                         </a>
                                     </li>
 
                                     <li>
                                         <a href="{{ route('admin.employee.edit', $employee->id) }}"
-                                            class="dropdown-item edit-employee-btn"> Edit
+                                            class="dropdown-item edit-employee-btn">
+                                            {{ __('edit') }}
                                         </a>
                                     </li>
                                     <li>
@@ -41,8 +42,8 @@
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm border-none dropdown-item"
-                                                onclick="return confirm('Are you sure you want to delete {{ $employee->fullName }}?');">
-                                                Delete
+                                                onclick="return confirm('{{ __('delete_confirm') }} {{ $employee->fullName }}?');">
+                                                {{ __('delete') }}
                                             </button>
                                         </form>
                                     </li>
@@ -63,11 +64,11 @@
                         <div class="p-3 bg-light rounded">
                             <div class="d-flex gap-3">
                                 <div class="w-50">
-                                    <span class="text-1xs">Department</span>
-                                    <h6 class="mb-0">{{ $employee->department->name ?? 'N/A' }}</h6>
+                                    <span class="text-1xs">{{ __('department') }}</span>
+                                    <h6 class="mb-0">{{ $employee->department->name ?? __('na') }}</h6>
                                 </div>
                                 <div class="w-50">
-                                    <span class="text-1xs">Hired Date</span>
+                                    <span class="text-1xs">{{ __('hired_date') }}</span>
                                     <h6 class="mb-0">{{ $employee->hire_date?->format('j M Y') }}</h6>
                                 </div>
                             </div>
@@ -98,6 +99,6 @@
     </div>
 @else
     <div class="alert alert-info" role="alert">
-        No employees found matching your criteria.
+        {{ __('no_employees_found') }}
     </div>
 @endif

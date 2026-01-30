@@ -204,7 +204,7 @@ class PublicHandler
         ]);
 
         // Clear auth cache
-        app(\App\Services\Telegram\TelegramAuthChecker::class)->clearCache($chatId);
+        app(\App\Services\Telegram\Helpers\TelegramAuthChecker::class)->clearCache($chatId);
 
         Telegram::sendMessage([
             'chat_id' => $chatId,
@@ -213,10 +213,10 @@ class PublicHandler
         ]);
 
         // Show appropriate menu based on role
-        $auth = app(\App\Services\Telegram\TelegramAuthChecker::class)->getUserType($chatId);
+        $auth = app(\App\Services\Telegram\Helpers\TelegramAuthChecker::class)->getUserType($chatId);
 
         if ($auth['type'] === 'hr' || $auth['type'] === 'admin') {
-            app(\App\Services\Telegram\Handlers\HRHandler::class)->sendMainMenu($chatId, $auth);
+            app(\App\Services\Telegram\Handlers\Admin\HRHandler::class)->sendMainMenu($chatId, $auth);
         } else {
             app(\App\Services\Telegram\Handlers\EmployeeHandler::class)->sendMainMenu($chatId, $auth);
         }

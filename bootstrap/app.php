@@ -33,11 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'telegram/*',
         ]);
 
-
         // Add TenantMiddleware to the 'web' group globally
         // This ensures all web routes automatically have tenant context
         $middleware->web(append: [
             \App\Http\Middleware\TenantMiddleware::class,
+            \App\Http\Middleware\SetUserLocale::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {})->create();

@@ -1,10 +1,9 @@
 @extends('admin.layouts.master')
 
-
 @section('content')
     <div class="app-page-head mb-4">
-        <h1 class="app-page-title">Attendance Settings</h1>
-        <span class="text-muted small">Configure where employees can check in via Telegram.</span>
+        <h1 class="app-page-title">{{ __('Attendance Settings') }}</h1>
+        <span class="text-muted small">{{ __('Configure where employees can check in via Telegram.') }}</span>
     </div>
 
     <div class="row g-4">
@@ -13,9 +12,10 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
                     <h5 class="card-title fw-bold">
-                        <i class="fa-solid fa-map-location-dot text-primary me-2"></i> Office Locations
+                        <i class="fa-solid fa-map-location-dot text-primary me-2"></i> {{ __('Office Locations') }}
                     </h5>
-                    <p class="text-muted small">Employees must be within the radius of these locations to check in.</p>
+                    <p class="text-muted small">
+                        {{ __('Employees must be within the radius of these locations to check in.') }}</p>
                 </div>
 
                 <div class="card-body">
@@ -28,16 +28,14 @@
                         {{-- Company Selection for Admin --}}
                         @if (Auth::user()->isAdmin() && isset($companies))
                             <div class="col-12">
-                                <label class="form-label text-xs fw-bold text-uppercase">Company</label>
+                                <label class="form-label text-xs fw-bold text-uppercase">{{ __('Company') }}</label>
                                 <select name="company_id"
                                     class="form-select form-select-sm @error('company_id') is-invalid @enderror">
-                                    <option value="">Select Company</option>
-                                    {{-- CHANGE THIS LINE --}}
+                                    <option value="">{{ __('Select Company') }}</option>
                                     @foreach ($companies as $company)
-                                        {{-- Iterate as $company object --}}
                                         <option value="{{ $company->id }}"
                                             {{ old('company_id') == $company->id ? 'selected' : '' }}>
-                                            {{ $company->name }} {{-- Access properties directly --}}
+                                            {{ $company->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -47,16 +45,16 @@
                             </div>
                         @endif
                         <div class="col-md-6">
-                            <label class="form-label text-xs fw-bold text-uppercase">Office Name</label>
+                            <label class="form-label text-xs fw-bold text-uppercase">{{ __('Office Name') }}</label>
                             <input type="text" name="name"
                                 class="form-control form-control-sm @error('name') is-invalid @enderror"
-                                placeholder="e.g. Head Office" value="{{ old('name') }}" required>
+                                placeholder="{{ __('e.g. Head Office') }}" value="{{ old('name') }}" required>
                             @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label text-xs fw-bold text-uppercase">Radius (Meters)</label>
+                            <label class="form-label text-xs fw-bold text-uppercase">{{ __('Radius (Meters)') }}</label>
                             <input type="number" name="radius_meters"
                                 class="form-control form-control-sm @error('radius_meters') is-invalid @enderror"
                                 value="{{ old('radius_meters', 100) }}" min="10" required>
@@ -67,7 +65,7 @@
                         <div class="col-md-3 d-flex align-items-end">
                             <button type="button" class="btn btn-sm btn-outline-secondary w-100"
                                 onclick="getCurrentLocation()">
-                                <i class="fa-solid fa-location-crosshairs"></i> Get My Loc
+                                <i class="fa-solid fa-location-crosshairs"></i> {{ __('Get My Loc') }}
                             </button>
                         </div>
 
@@ -85,7 +83,7 @@
 
                         <div class="col-12 text-end">
                             <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="fa-solid fa-plus"></i> Add Location
+                                <i class="fa-solid fa-plus"></i> {{ __('Add Location') }}
                             </button>
                         </div>
                     </form>
@@ -93,7 +91,7 @@
                     <hr class="my-4">
 
                     <!-- List of Locations -->
-                    <h6 class="fw-bold mb-3 small text-uppercase">Active Locations</h6>
+                    <h6 class="fw-bold mb-3 small text-uppercase">{{ __('Active Locations') }}</h6>
                     <div class="list-group list-group-flush">
                         @forelse($locations as $location)
                             <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
@@ -117,13 +115,13 @@
                                     method="POST">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-icon btn-light text-danger"
-                                        onclick="return confirm('Remove this location?')">
+                                        onclick="return confirm('{{ __('Remove this location?') }}')">
                                         <i class="fa-regular fa-trash-can"></i>
                                     </button>
                                 </form>
                             </div>
                         @empty
-                            <div class="text-center py-3 text-muted small">No locations added yet.</div>
+                            <div class="text-center py-3 text-muted small">{{ __('No locations added yet.') }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -134,8 +132,9 @@
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
-                    <h5 class="card-title fw-bold"><i class="fa-solid fa-wifi text-info me-2"></i> Office WiFi</h5>
-                    <p class="text-muted small">Allow check-in only when connected to these IPs.</p>
+                    <h5 class="card-title fw-bold"><i class="fa-solid fa-wifi text-info me-2"></i> {{ __('Office WiFi') }}
+                    </h5>
+                    <p class="text-muted small">{{ __('Allow check-in only when connected to these IPs.') }}</p>
                 </div>
 
                 <div class="card-body">
@@ -144,11 +143,11 @@
                             <i class="fa-solid fa-laptop"></i>
                         </div>
                         <div>
-                            <div class="text-xs text-muted">Your Current IP</div>
+                            <div class="text-xs text-muted">{{ __('Your Current IP') }}</div>
                             <div class="fw-bold text-dark font-monospace" id="current-ip">{{ $currentIp }}</div>
                         </div>
                         <button type="button" class="btn btn-xs btn-outline-info ms-auto" onclick="useCurrentIp()">
-                            Use This
+                            {{ __('Use This') }}
                         </button>
                     </div>
 
@@ -158,16 +157,14 @@
                         {{-- Company Selection for Admin --}}
                         @if (Auth::user()->isAdmin() && isset($companies))
                             <div class="col-12">
-                                <label class="form-label text-xs fw-bold text-uppercase">Company</label>
+                                <label class="form-label text-xs fw-bold text-uppercase">{{ __('Company') }}</label>
                                 <select name="company_id"
                                     class="form-select form-select-sm @error('company_id') is-invalid @enderror">
-                                    <option value="">Select Company</option>
-                                    {{-- CHANGE THIS LINE --}}
+                                    <option value="">{{ __('Select Company') }}</option>
                                     @foreach ($companies as $company)
-                                        {{-- Iterate as $company object --}}
                                         <option value="{{ $company->id }}"
                                             {{ old('company_id') == $company->id ? 'selected' : '' }}>
-                                            {{ $company->name }} {{-- Access properties directly --}}
+                                            {{ $company->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -178,10 +175,11 @@
                         @endif
 
                         <div class="col-12">
-                            <label class="form-label text-xs fw-bold text-uppercase">Office Location (Optional)</label>
+                            <label
+                                class="form-label text-xs fw-bold text-uppercase">{{ __('Office Location (Optional)') }}</label>
                             <select name="office_location_id"
                                 class="form-select form-select-sm @error('office_location_id') is-invalid @enderror">
-                                <option value="">No specific location</option>
+                                <option value="">{{ __('No specific location') }}</option>
                                 @foreach ($locations as $location)
                                     <option value="{{ $location->id }}"
                                         {{ old('office_location_id') == $location->id ? 'selected' : '' }}>
@@ -197,34 +195,38 @@
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label text-xs fw-bold text-uppercase">WiFi Name / Identifier</label>
+                            <label
+                                class="form-label text-xs fw-bold text-uppercase">{{ __('WiFi Name / Identifier') }}</label>
                             <input type="text" name="network_name"
                                 class="form-control form-control-sm @error('network_name') is-invalid @enderror"
-                                placeholder="e.g. Office Guest WiFi" value="{{ old('network_name') }}" required>
+                                placeholder="{{ __('e.g. Office Guest WiFi') }}" value="{{ old('network_name') }}"
+                                required>
                             @error('network_name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                         <div class="col-12">
-                            <label class="form-label text-xs fw-bold text-uppercase">IP Address / Range</label>
+                            <label
+                                class="form-label text-xs fw-bold text-uppercase">{{ __('IP Address / Range') }}</label>
                             <input type="text" name="ip_range" id="ip_input"
                                 class="form-control form-control-sm @error('ip_range') is-invalid @enderror"
-                                placeholder="e.g. 192.168.1.1" value="{{ old('ip_range') }}" required>
-                            <div class="form-text text-xs">Enter the public IP address of your office router.</div>
+                                placeholder="{{ __('e.g. 192.168.1.1') }}" value="{{ old('ip_range') }}" required>
+                            <div class="form-text text-xs">{{ __('Enter the public IP address of your office router.') }}
+                            </div>
                             @error('ip_range')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                         <div class="col-12 text-end">
                             <button type="submit" class="btn btn-info btn-sm text-white">
-                                <i class="fa-solid fa-plus"></i> Add WiFi
+                                <i class="fa-solid fa-plus"></i> {{ __('Add WiFi') }}
                             </button>
                         </div>
                     </form>
 
                     <hr class="my-4">
 
-                    <h6 class="fw-bold mb-3 small text-uppercase">Allowed Networks</h6>
+                    <h6 class="fw-bold mb-3 small text-uppercase">{{ __('Allowed Networks') }}</h6>
                     <div class="list-group list-group-flush">
                         @forelse($wifis as $wifi)
                             <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
@@ -247,13 +249,13 @@
                                     method="POST">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-icon btn-light text-danger"
-                                        onclick="return confirm('Remove this WiFi?')">
+                                        onclick="return confirm('{{ __('Remove this WiFi?') }}')">
                                         <i class="fa-regular fa-trash-can"></i>
                                     </button>
                                 </form>
                             </div>
                         @empty
-                            <div class="text-center py-3 text-muted small">No WiFi networks added.</div>
+                            <div class="text-center py-3 text-muted small">{{ __('No WiFi networks added.') }}</div>
                         @endforelse
                     </div>
                 </div>
@@ -296,8 +298,8 @@
             else {
                 myPlacemark = new ymaps.Placemark(
                     coords, {
-                        hintContent: "Office Location",
-                        balloonContent: "Selected Point",
+                        hintContent: "{{ __('Office Location') }}",
+                        balloonContent: "{{ __('Selected Point') }}",
                     }, {
                         preset: "islands#blueDotIcon",
                         draggable: true,
@@ -338,7 +340,7 @@
         function getCurrentLocation() {
             const btn = document.querySelector('button[onclick="getCurrentLocation()"]');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Locating...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> {{ __('Locating...') }}';
             btn.disabled = true;
 
             // Use Yandex Geolocation Provider
@@ -371,13 +373,13 @@
                                     btn.disabled = false;
                                 },
                                 function(error) {
-                                    alert("Could not get location. Please allow GPS access.");
+                                    alert("{{ __('Could not get location. Please allow GPS access.') }}");
                                     btn.innerHTML = originalText;
                                     btn.disabled = false;
                                 },
                             );
                         } else {
-                            alert("Geolocation not supported.");
+                            alert("{{ __('Geolocation not supported.') }}");
                             btn.innerHTML = originalText;
                             btn.disabled = false;
                         }
